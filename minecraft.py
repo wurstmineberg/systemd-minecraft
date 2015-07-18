@@ -12,7 +12,7 @@ Usage:
 Options:
   -h, --help         Print this message and exit.
   --all              Apply the action to all configured worlds.
-  --config=<config>  Path to the config file [default: /opt/wurstmineberg/config/init-minecraft.json].
+  --config=<config>  Path to the config file [default: /opt/wurstmineberg/config/systemd-minecraft.json].
   --main             Apply the action to the main world. This is the default.
   --version          Print version info and exit.
 """
@@ -94,7 +94,7 @@ DEFAULT_CONFIG = {
     }
 }
 
-CONFIG_FILE = '/opt/wurstmineberg/config/init-minecraft.json'
+CONFIG_FILE = pathlib.Path('/opt/wurstmineberg/config/systemd-minecraft.json')
 
 if __name__ == '__main__':
     arguments = docopt(__doc__, version='Minecraft init script ' + __version__)
