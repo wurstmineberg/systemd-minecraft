@@ -9,9 +9,8 @@ Conflicts=mscs.service
 Type=forking
 User=wurstmineberg
 Group=wurstmineberg
-ExecStart=python3 -m minecraft start
-ExecReload=python3 -m minecraft reload
-ExecStop=python3 -m minecraft stop
+ExecStart=minecraft start
+ExecStop=minecraft stop
 RestartSec=1
 
 [Install]
