@@ -1,0 +1,18 @@
+[Unit]
+Description=Server for the Minecraft game
+Documentation=https://github.com/wurstmineberg/systemd-minecraft
+Documentation=http://minecraft.gamepedia.com/Server
+After=network.target
+Conflicts=mscs.service
+
+[Service]
+Type=forking
+User=wurstmineberg
+Group=wurstmineberg
+ExecStart=python3 -m minecraft start
+ExecReload=python3 -m minecraft reload
+ExecStop=python3 -m minecraft stop
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
