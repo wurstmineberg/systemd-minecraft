@@ -1,4 +1,4 @@
-This is **a systemd init script for one or mode Notchian (vanilla) [Minecraft][] servers**, with some [Wurstmineberg][]-specific extras.
+This is **a systemd init script for one or more Notchian (vanilla) [Minecraft][] servers**, with some [Wurstmineberg][]-specific extras.
 
 This is version 3.0.0 ([semver][Semver]) of the init script. The versioned API includes a CLI, as found in the docstring of [`minecraft.py`](minecraft.py), as well as a Python API including all documented functions defined in minecraft.py.
 
