@@ -247,7 +247,7 @@ class World:
             self.service_path.unlink()
         self.service_path.symlink_to(CONFIG['paths']['jar'] / 'minecraft_server.{}.jar'.format(version))
         client_jar_path = CONFIG['paths']['home'] / 'home' / 'client.jar'
-        if self.is_main()
+        if self.is_main():
             if client_jar_path.exists():
                 client_jar_path.unlink()
             client_jar_path.symlink_to(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version))
@@ -573,7 +573,10 @@ def worlds():
         yield World(world_name)
 
 if __name__ == '__main__':
-    wurstmineberg_user = pwd.getpwnam('wurstmineberg')
+    try:
+        wurstmineberg_user = pwd.getpwnam('wurstmineberg')
+    except:
+        sys.exit('[!!!!] User ‘wurstmineberg’ does not exist!')
     if os.geteuid() != wurstmineberg_user.pw_uid:
         sys.exit('[!!!!] Only the user ‘wurstmineberg’ may use this program!')
     if arguments['--all']:
