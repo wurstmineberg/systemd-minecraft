@@ -6,13 +6,13 @@ Requirements
 ============
 
 *   systemd
-*   [Python][] 3.2
+*   [Python][] 3.4
 *   The current version of the Minecraft server, available from [here][MinecraftDownload] or using the `minecraft update` command.
 *   [docopt][Docopt]
 *   [lazyjson][LazyJSON] 1.0 (for whitelist management)
 *   [loops][PythonLoops] 1.1 (for server start)
 *   [more-itertools][MoreItertools] 2.1
-*   [requests][Requests] 2.1 (for updating)
+*   [requests][Requests] 2.1 (for updating and whitelist management)
 
 Configuration
 =============
