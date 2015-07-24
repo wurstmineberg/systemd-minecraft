@@ -586,26 +586,26 @@ if __name__ == '__main__':
     else:
         selected_worlds = [World()]
     if arguments['start']:
-        for world in worlds:
+        for world in selected_worlds:
             if world.config['enabled']:
                 if not world.start():
                     print('[FAIL] Error! Could not start the {} world.'.format(world))
         else:
             print('[ ok ] Minecraft is now running.')
     elif arguments['stop']:
-        for world in worlds:
+        for world in selected_worlds:
             if not world.stop():
                 print('[FAIL] Error! Could not stop the {} world.'.format(world))
         else:
             print('[ ok ] Minecraft is stopped.')
     elif arguments['restart']:
-        for world in worlds:
+        for world in selected_worlds:
             if not world.restart():
                 print('[FAIL] Error! Could not restart the {} world.'.format(world))
         else:
             print('[ ok ] Minecraft is now running.')
     elif arguments['update']:
-        for world in worlds:
+        for world in selected_worlds:
             if arguments['snapshot']:
                 world.update(arguments['<snapshot-id>'], snapshot=True)
             elif arguments['VERSION']:
@@ -613,18 +613,18 @@ if __name__ == '__main__':
             else:
                 world.update(snapshot=True)
     elif arguments['backup']:
-        for world in worlds:
+        for world in selected_worlds:
             world.backup()
     elif arguments['status']:
-        statuses = {world: world.status() for world in worlds}
+        statuses = {world: world.status() for world in selected_worlds}
         for world, world_status in statuses.items():
             print('[info] The {} world is{} running'.format(world, '' if world_status else ' not'))
         if not any(statuses.values()):
             sys.exit(1)
     elif arguments['command']:
-        worlds = list(worlds)
-        for world in worlds:
-            if len(worlds) > 1:
+        selected_worlds = list(selected_worlds)
+        for world in selected_worlds:
+            if len(selected_worlds) > 1:
                 print('[info] running command on {} world'.format(world))
             cmdlog = world.command(arguments['<command>'][0], arguments['<command>'][1:])
             for line in cmdlog.splitlines():
