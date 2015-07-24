@@ -322,7 +322,7 @@ class World:
 
     @property
     def socket_path(self):
-        CONFIG['paths']['sockets'] / self.name
+        return CONFIG['paths']['sockets'] / self.name
 
     def start(self, *args, **kwargs):
         def feed_commands(java_popen):
