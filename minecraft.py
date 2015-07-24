@@ -359,7 +359,7 @@ class World:
             reply('Server is already running!')
             return False
         reply(kwargs.get('start_message', 'starting Minecraft server...'))
-        java_popen = subprocess.Popen(invocation, stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=self.path) # start the java process
+        java_popen = subprocess.Popen(invocation, stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=str(self.path)) # start the java process
         for line in loops.timeout_total(java_popen.stdout, timedelta(seconds=CONFIG['startTimeout'])): # wait until the timeout has been exceeded...
             if re.match(regexes.full_timestamp + ' [Server thread/INFO]: Done \\([0-9]+.[0-9]+s\\)!', line.decode('utf-8')): # ...or the server has finished starting
                 break
