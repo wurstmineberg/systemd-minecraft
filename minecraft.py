@@ -238,10 +238,11 @@ class World:
                 (CONFIG['paths']['clientVersions'] / version).mkdir(parents=True)
             _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/{0}.jar'.format(version), local_filename=str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)))
         yield 'Download finished. Stopping server...'
-        self.say('Server will be upgrading to ' + version_text + ' and therefore restart')
-        time.sleep(5)
         was_running = self.status()
-        self.stop(reply=reply, log_path=log_path)
+        if was_running:
+            self.say('Server will be upgrading to ' + version_text + ' and therefore restart')
+            time.sleep(5)
+            self.stop(reply=reply, log_path=log_path)
         yield 'Server stopped. Installing new server...'
         if self.service_path.exists():
             self.service_path.unlink()
