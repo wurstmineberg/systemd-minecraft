@@ -621,7 +621,7 @@ if __name__ == '__main__':
     elif arguments['status']:
         statuses = {world: world.status() for world in selected_worlds}
         for world, world_status in statuses.items():
-            print('[info] The {} world is{} running'.format(world, '' if world_status else ' not'))
+            print('[info] The {} world (Minecraft {}) is{} running'.format(world, world.version(), '' if world_status else ' not'))
         if not any(statuses.values()):
             sys.exit(1)
     elif arguments['command']:
