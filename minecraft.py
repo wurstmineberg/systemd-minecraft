@@ -235,7 +235,7 @@ class World:
             _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/minecraft_server.{0}.jar'.format(version), local_filename=str(jar_path))
         if 'clientVersions' in CONFIG['paths']:
             with contextlib.suppress(FileExistsError):
-                (CONFIG['paths'] / version).mkdir(parents=True)
+                (CONFIG['paths']['clientVersions'] / version).mkdir(parents=True)
             _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/{0}.jar'.format(version), local_filename=str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)))
         yield 'Download finished. Stopping server...'
         self.say('Server will be upgrading to ' + version_text + ' and therefore restart')
