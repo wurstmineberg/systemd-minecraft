@@ -592,19 +592,19 @@ if __name__ == '__main__':
         for world in selected_worlds:
             if world.config['enabled']:
                 if not world.start():
-                    print('[FAIL] Error! Could not start the {} world.'.format(world))
+                    sys.exit('[FAIL] Error! Could not start the {} world.'.format(world))
         else:
             print('[ ok ] Minecraft is now running.')
     elif arguments['stop']:
         for world in selected_worlds:
             if not world.stop():
-                print('[FAIL] Error! Could not stop the {} world.'.format(world))
+                sys.exit('[FAIL] Error! Could not stop the {} world.'.format(world))
         else:
             print('[ ok ] Minecraft is stopped.')
     elif arguments['restart']:
         for world in selected_worlds:
             if not world.restart():
-                print('[FAIL] Error! Could not restart the {} world.'.format(world))
+                sys.exit('[FAIL] Error! Could not restart the {} world.'.format(world))
         else:
             print('[ ok ] Minecraft is now running.')
     elif arguments['update']:
