@@ -611,7 +611,7 @@ if __name__ == '__main__':
         for world in selected_worlds:
             if arguments['snapshot']:
                 world.update(arguments['<snapshot-id>'], snapshot=True)
-            elif arguments['VERSION']:
+            elif arguments['<version>']:
                 world.update(arguments['<snapshot-id>'])
             else:
                 world.update(snapshot=True)
