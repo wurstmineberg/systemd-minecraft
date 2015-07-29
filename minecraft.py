@@ -373,7 +373,7 @@ class World:
             self.socket_path.parent.mkdir(parents=True)
         java_popen = subprocess.Popen(invocation, stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=str(self.path)) # start the java process
         for line in loops.timeout_total(java_popen.stdout, timedelta(seconds=CONFIG['startTimeout'])): # wait until the timeout has been exceeded...
-            if re.match(regexes.full_timestamp + ' [Server thread/INFO]: Done \\([0-9]+.[0-9]+s\\)!', line.decode('utf-8')): # ...or the server has finished starting
+            if re.match(regexes.full_timestamp + ' \\[Server thread/INFO\\]: Done \\([0-9]+.[0-9]+s\\)!', line.decode('utf-8')): # ...or the server has finished starting
                 break
         _fork(feed_commands, java_popen) # feed commands from the socket to java
         _fork(more_itertools.consume, java_popen.stdout) # consume java stdout to prevent deadlocking
