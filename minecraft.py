@@ -145,7 +145,7 @@ class World:
         reply('Compressing backup...')
         subprocess.call(['gzip', '-f', str(backup_file)])
         backup_file = pathlib.Path(str(backup_file) + '.gz')
-        if self.is_main():
+        if self.is_main:
             reply('Symlinking to httpdocs...')
             if CONFIG['paths']['backupWeb'].is_symlink():
                 CONFIG['paths']['backupWeb'].unlink()
@@ -204,6 +204,7 @@ class World:
         ret['whitelist'].update(CONFIG['worlds'][self.name].get('whitelist', {}))
         return ret
 
+    @property
     def is_main(self):
         return self.name == CONFIG['mainWorld']
 
@@ -255,7 +256,7 @@ class World:
             self.service_path.unlink()
         self.service_path.symlink_to(CONFIG['paths']['jar'] / 'minecraft_server.{}.jar'.format(version))
         client_jar_path = CONFIG['paths']['home'] / 'home' / 'client.jar'
-        if self.is_main():
+        if self.is_main:
             if client_jar_path.exists():
                 client_jar_path.unlink()
             client_jar_path.symlink_to(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version))
