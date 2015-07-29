@@ -595,7 +595,7 @@ if __name__ == '__main__':
     if arguments['--all']:
         selected_worlds = worlds()
     elif arguments['<world>']:
-        selected_worlds = arguments['<world>']
+        selected_worlds = (World(world_name) for world_name in arguments['<world>'])
     else:
         selected_worlds = [World()]
     if arguments['start']:
