@@ -4,8 +4,8 @@
 
 Usage:
   minecraft [options] start | stop | restart | status | backup [<world>...]
-  minecraft [options] update [(<world> | --all | --main) [snapshot <snapshot-id> | <version>]]
-  minecraft [options] command (<world> | --all | --main) <command>...
+  minecraft [options] update [(<world> | all | main) [snapshot <snapshot-id> | <version>]]
+  minecraft [options] command (<world> | all | main) <command>...
   minecraft -h | --help
   minecraft --version
 
@@ -592,7 +592,7 @@ if __name__ == '__main__':
         sys.exit('[!!!!] User ‘wurstmineberg’ does not exist!')
     if os.geteuid() != wurstmineberg_user.pw_uid:
         sys.exit('[!!!!] Only the user ‘wurstmineberg’ may use this program!')
-    if arguments['--all']:
+    if arguments['--all'] or arguments['all']:
         selected_worlds = worlds()
     elif arguments['<world>']:
         selected_worlds = (World(world_name) for world_name in arguments['<world>'])
