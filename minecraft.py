@@ -136,7 +136,7 @@ class World:
             path = str(CONFIG['paths']['backup'] / '{}_{}'.format(self.name, now))
         backup_file = pathlib.Path(path + '.tar')
         reply('Backing up minecraft world...')
-        subprocess.call(['tar', '-C', str(self.path), '-cf', backup_file, self.name]) # tar the world directory (e.g. /opt/wurstmineberg/world/wurstmineberg/wurstmineberg)
+        subprocess.call(['tar', '-C', str(self.path), '-cf', str(backup_file), self.name]) # tar the world directory (e.g. /opt/wurstmineberg/world/wurstmineberg/wurstmineberg)
         subprocess.call(['rsync', '-av', '--delete', str(self.path / self.name) + '/', str(CONFIG['paths']['backup'] / self.name / 'latest')])
         self.save_on(announce=announce, reply=reply)
         reply('Compressing backup...')
