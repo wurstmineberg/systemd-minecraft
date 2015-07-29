@@ -133,21 +133,28 @@ class World:
         self.save_off(announce=announce, reply=reply)
         if path is None:
             now = datetime.utcnow().strftime('%Y-%m-%d_%Hh%M')
-            path = str(CONFIG['paths']['backup'] / '{}_{}'.format(self.name, now))
+            path = str(self.backup_path / '{}_{}'.format(self.name, now))
         backup_file = pathlib.Path(path + '.tar')
         reply('Backing up minecraft world...')
+        if not self.backup_path.exists():
+            # make sure the world backup directory exists
+            self.backup_path.mkdir(parents=True)
         subprocess.call(['tar', '-C', str(self.path), '-cf', str(backup_file), self.name]) # tar the world directory (e.g. /opt/wurstmineberg/world/wurstmineberg/wurstmineberg)
-        subprocess.call(['rsync', '-av', '--delete', str(self.path / self.name) + '/', str(CONFIG['paths']['backup'] / self.name / 'latest')])
+        subprocess.call(['rsync', '-av', '--delete', str(self.path / self.name) + '/', str(self.backup_path / 'latest')])
         self.save_on(announce=announce, reply=reply)
         reply('Compressing backup...')
         subprocess.call(['gzip', '-f', str(backup_file)])
         backup_file = pathlib.Path(str(backup_file) + '.gz')
         if self.is_main():
             reply('Symlinking to httpdocs...')
-            if CONFIG['paths']['backupweb'].is_symlink():
-                CONFIG['paths']['backupweb'].unlink()
-            CONFIG['paths']['backupweb'].symlink_to(backup_file)
+            if CONFIG['paths']['backupWeb'].is_symlink():
+                CONFIG['paths']['backupWeb'].unlink()
+            CONFIG['paths']['backupWeb'].symlink_to(backup_file)
         reply('Done.')
+
+    @property
+    def backup_path(self):
+        return CONFIG['paths']['backup'] / self.name
 
     def command(self, cmd, args=[], block=False):
         """Send a command to the server.
