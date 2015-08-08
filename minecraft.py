@@ -3,7 +3,7 @@
 """Systemd init script for one or more vanilla Minecraft servers.
 
 Usage:
-  minecraft [options] start | stop | restart | status | backup [<world>...]
+  minecraft [options] (start | stop | restart | status | backup) [<world>...]
   minecraft [options] update [<world> [snapshot <snapshot-id> | <version>]]
   minecraft [options] update-all [snapshot <snapshot-id> | <version>]
   minecraft [options] command <world> <command>...
