@@ -3,7 +3,7 @@
 """Systemd init script for one or more vanilla Minecraft servers.
 
 Usage:
-  minecraft [options] (start | stop | restart | status | backup) [<world>...]
+  minecraft [options] (start | stop | kill | restart | status | backup) [<world>...]
   minecraft [options] update [<world> [snapshot <snapshot-id> | <version>]]
   minecraft [options] update-all [snapshot <snapshot-id> | <version>]
   minecraft [options] command <world> <command>...
@@ -33,6 +33,7 @@ import json
 import loops
 import more_itertools
 import os
+import signal
 import os.path
 import pathlib
 import pwd
@@ -77,6 +78,7 @@ DEFAULT_CONFIG = {
         'log': '/opt/wurstmineberg/log',
         'logConfig': 'log4j2.xml',
         'people': '/opt/wurstmineberg/config/people.json',
+        'pidfiles': '/var/local/wurstmineberg/pidfiles',
         'service': 'minecraft_server.jar',
         'sockets': '/var/local/wurstmineberg/minecraft_commands',
         'worlds': '/opt/wurstmineberg/world'
@@ -194,6 +196,14 @@ class World:
         time.sleep(0.2) # assumes that the command will run and print to the log file in less than .2 seconds
         return _command_output('tail', ['-n', '+' + str(pre_log_len + 1), str(self.path / 'logs' / 'latest.log')])
 
+    def cleanup(self, reply=print):
+        if self.pidfile_path.exists():
+            reply("Removing PID file...")
+            self.pidfile_path.unlink()
+        if self.socket_path.exists():
+            reply("Removing socket file...")
+            self.socket_path.unlink()
+
     @property
     def config(self):
         ret = {
@@ -268,9 +278,62 @@ class World:
         if was_running:
             self.start(reply=reply, start_message='Server updated. Restarting...', log_path=log_path)
 
+    def kill(self, reply=print):
+        """Kills a non responding minecraft server using the PID saved in the PID file."""
+        with self.pidfile_path.open("r") as pidfile:
+            pid = int(pidfile.read())
+        reply("World '" + self.name + "': Sending SIGTERM to PID " + str(pid) + " and waiting 60 seconds for shutdown...")
+        try:
+            os.kill(pid, signal.SIGTERM)
+            for _ in range(60):
+                try:
+                    os.kill(pid, 0)
+                    time.sleep(1)
+                    continue
+                except OSError:
+                    reply("Terminated world '" + self.name + "'")
+                    break
+            else:
+                reply("Could not terminate with SIGQUIT. Sending SIGKILL to PID " + str(pid) + "...")
+                os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            reply("Process does not exist. Cleaning up...")
+        finally:
+            self.cleanup(reply)
+        return not self.status()
+
     @property
     def path(self):
         return CONFIG['paths']['worlds'] / self.name
+
+    @property
+    def pid(self):
+        try:
+            with self.pidfile_path.open("r") as pidfile:
+                return int(pidfile.read())
+        except FileNotFoundError:
+            return None
+
+    def pidrunning(self):
+        if self.pidfile_path.exists() and self.pid is not None:
+            try:
+                os.kill(self.pid, 0)
+                return True
+            except ProcessLookupError:
+                return False
+        return False
+
+    def pidstatus(self, reply=print):
+        if self.pidrunning():
+            return True
+        elif self.pidfile_path.exists():
+            reply("PID file exists but process is terminated. Cleaning up...")
+            self.cleanup(reply)
+        return False
+
+    @property
+    def pidfile_path(self):
+        return CONFIG['paths']['pidfiles'] / (self.name + ".pid")
 
     def restart(self, *args, **kwargs):
         reply = kwargs.get('reply', print)
@@ -338,41 +401,62 @@ class World:
         def feed_commands(java_popen):
             loop_var = True
             with socket.socket(socket.AF_UNIX) as s:
+                # Set 10 minute timeout so that the process actually exits (this is not crucial but we don't want to spam the system)
+                s.settimeout(10)
                 if self.socket_path.exists():
                     self.socket_path.unlink()
                 s.bind(str(self.socket_path))
                 while loop_var and self.socket_path.exists():
                     str_buffer = ''
-                    s.listen(1)
-                    c, _ = s.accept()
-                    while loop_var:
-                        data = c.recv(1024)
-                        if not data:
-                            break
-                        lines = (str_buffer + data.decode('utf-8')).split('\n')
-                        for line in lines[:-1]:
-                            if line == 'stop':
-                                loop_var = False
+                    try:
+                        s.listen(1)
+                        c, _ = s.accept()
+                        while loop_var:
+                            data = c.recv(1024)
+                            if not data:
                                 break
-                            java_popen.stdin.write(line.encode('utf-8') + b'\n')
-                        str_buffer = lines[-1]
-                    c.close()
-                    if java_popen.poll() is not None:
-                        return
+                            lines = (str_buffer + data.decode('utf-8')).split('\n')
+                            for line in lines[:-1]:
+                                if line == 'stop':
+                                    loop_var = False
+                                    break
+                                java_popen.stdin.write(line.encode('utf-8') + b'\n')
+                            str_buffer = lines[-1]
+                        c.close()
+                        if java_popen.poll() is not None:
+                            return
+                    except socket.timeout:
+                        continue
             java_popen.communicate(input=b'stop\n')
             if self.socket_path.exists():
                 self.socket_path.unlink()
 
-        invocation = ['java', '-Xmx' + str(self.config['javaOptions']['maxHeap']) + 'M', '-Xms' + str(self.config['javaOptions']['minHeap']) + 'M', '-XX:+UseConcMarkSweepGC', '-XX:+CMSIncrementalMode', '-XX:+CMSIncrementalPacing', '-XX:ParallelGCThreads=' + str(self.config['javaOptions']['cpuCount']), '-XX:+AggressiveOpts', '-Dlog4j.configurationFile=' + str(CONFIG['paths']['logConfig']), '-jar', str(CONFIG['paths']['service'])] + self.config['javaOptions']['jarOptions']
+        invocation = ['java', '-Xmx' + str(self.config['javaOptions']['maxHeap']) + 'M',
+                              '-Xms' + str(self.config['javaOptions']['minHeap']) + 'M',
+                              '-XX:+UseConcMarkSweepGC',
+                              '-XX:+CMSIncrementalMode',
+                              '-XX:+CMSIncrementalPacing',
+                              '-XX:ParallelGCThreads=' + str(self.config['javaOptions']['cpuCount']),
+                              '-XX:+AggressiveOpts',
+                              '-Dlog4j.configurationFile=' + str(CONFIG['paths']['logConfig']),
+                              '-jar', str(CONFIG['paths']['service'])] + self.config['javaOptions']['jarOptions']
+
         reply = kwargs.get('reply', print)
         if self.status():
             reply('Server is already running!')
             return False
-        reply(kwargs.get('start_message', 'starting Minecraft server...'))
+        reply(kwargs.get('start_message', 'Starting Minecraft server...'))
+
         if not self.socket_path.parent.exists():
             # make sure the command sockets directory exists
             self.socket_path.parent.mkdir(parents=True)
+        if not self.pidfile_path.parent.exists():
+            # make sure the command pidfile directory exists
+            self.pidfile_path.parent.mkdir(parents=True)
+
         java_popen = subprocess.Popen(invocation, stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=str(self.path)) # start the java process
+        with self.pidfile_path.open("w+") as pidfile:
+            pidfile.write(str(java_popen.pid))
         for line in loops.timeout_total(java_popen.stdout, timedelta(seconds=CONFIG['startTimeout'])): # wait until the timeout has been exceeded...
             if re.match(regexes.full_timestamp + ' \\[Server thread/INFO\\]: Done \\([0-9]+.[0-9]+s\\)!', line.decode('utf-8')): # ...or the server has finished starting
                 break
@@ -382,40 +466,48 @@ class World:
             with (kwargs['log_path'].open('a') if hasattr(kwargs['log_path'], 'open') else open(kwargs['log_path'], 'a')) as logins_log:
                 ver = self.version()
                 print(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + (' @restart' if ver is None else ' @start ' + ver), file=logins_log) # logs in UTC
+
+        # Wait for the socket listener to spin up
+        for _ in range(20):
+            if not self.status():
+                time.sleep(0.5)
+            else:
+                break
         return self.status()
 
-    def status(self):
-        return self.socket_path.exists()
+    def status(self, reply=print):
+        return self.pidstatus(reply=reply) and self.socket_path.exists()
 
     def stop(self, *args, **kwargs):
         reply = kwargs.get('reply', print)
         if self.status():
-            reply('SERVER SHUTTING DOWN IN 10 SECONDS. Saving map...')
-            notice = kwargs.get('notice', 'SERVER SHUTTING DOWN IN 10 SECONDS. Saving map...')
-            if notice is not None:
-                self.say(str(notice))
-            self.command('save-all')
-            time.sleep(10)
-            self.command('stop')
-            time.sleep(7)
-            for _ in range(12):
-                if self.status():
-                    time.sleep(5)
-                    continue
+            try:
+                reply('SERVER SHUTTING DOWN IN 10 SECONDS. Saving map...')
+                notice = kwargs.get('notice', 'SERVER SHUTTING DOWN IN 10 SECONDS. Saving map...')
+                if notice is not None:
+                    self.say(str(notice))
+                self.command('save-all')
+                time.sleep(10)
+                self.command('stop')
+                time.sleep(7)
+                for _ in range(12):
+                    if self.status():
+                        time.sleep(5)
+                        continue
+                    else:
+                        break
                 else:
-                    break
-            else:
-                reply('The server could not be stopped! D:')
-                if self.socket_path.exists():
-                    self.socket_path.unlink()
-                return False #TODO change this or improve status check
-            if kwargs.get('log_path'):
-                with (kwargs['log_path'].open('a') if hasattr(kwargs['log_path'], 'open') else open(kwargs['log_path'], 'a')) as logins_log:
-                    print(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + ' @stop', file=logins_log) # logs in UTC
+                    reply('The server could not be stopped! Killing...')
+                    return self.kill()
+                if kwargs.get('log_path'):
+                    with (kwargs['log_path'].open('a') if hasattr(kwargs['log_path'], 'open') else open(kwargs['log_path'], 'a')) as logins_log:
+                        print(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + ' @stop', file=logins_log) # logs in UTC
+            except ConnectionRefusedError:
+                reply("Can't communicate with the socket. We need to kill the server...")
+                return self.kill()
         else:
             reply('Minecraft server was not running.')
-        if self.socket_path.exists():
-            self.socket_path.unlink()
+        self.cleanup(reply=reply)
         return not self.status()
 
     def tellraw(self, message_dict, player='@a'):
@@ -599,6 +691,12 @@ if __name__ == '__main__':
         selected_worlds = (World(world_name) for world_name in arguments['<world>'])
     else:
         selected_worlds = [World()]
+    if arguments['kill']:
+        for world in selected_worlds:
+            if world.pidstatus():
+                world.kill()
+            else:
+                sys.exit('[WARN] Could not kill the "{}" world, PID file does not exist.'.format(world))
     if arguments['start']:
         for world in selected_worlds:
             if world.config['enabled']:
@@ -630,10 +728,18 @@ if __name__ == '__main__':
         for world in selected_worlds:
             world.backup()
     elif arguments['status']:
-        statuses = {world: world.status() for world in selected_worlds}
-        for world, world_status in statuses.items():
-            print('[info] The {} world (Minecraft {}) is{} running'.format(world, world.version(), '' if world_status else ' not'))
-        if not any(statuses.values()):
+        exit1 = False
+        for world in selected_worlds:
+            mcversion = "" if world.version() == "" else "(Minecraft {}) ".format(world.version())
+            if world.status():
+                print('[info] The "{}" world {}is running with PID {}.'.format(world, mcversion, world.pid))
+            else:
+                exit1 = True
+                if world.pidstatus():
+                    print('[info] The "{}" world is running but the socket file does not exist. Please kill the world and restart.'.format(world))
+                else:
+                    print('[info] The "{}" world {}is not running.'.format(world, mcversion))
+        if exit1:
             sys.exit(1)
     elif arguments['command']:
         selected_worlds = list(selected_worlds)
