@@ -402,7 +402,7 @@ class World:
             loop_var = True
             with socket.socket(socket.AF_UNIX) as s:
                 # Set 10 minute timeout so that the process actually exits (this is not crucial but we don't want to spam the system)
-                s.settimeout(10)
+                s.settimeout(600)
                 if self.socket_path.exists():
                     self.socket_path.unlink()
                 s.bind(str(self.socket_path))
