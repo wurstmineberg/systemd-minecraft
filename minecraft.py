@@ -314,18 +314,17 @@ class World:
         except FileNotFoundError:
             return None
 
-    def pidrunning(self):
-        if self.pidfile_path.exists() and self.pid is not None:
-            try:
-                os.kill(self.pid, 0)
-                return True
-            except ProcessLookupError:
-                return False
-        return False
+    def pidrunning(self, pid):
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
 
     def pidstatus(self, reply=print):
-        if self.pidrunning():
-            return True
+        if self.pidfile_path.exists() and self.pid is not None:
+            if self.pidrunning(self.pid):
+                return True
         elif self.pidfile_path.exists():
             reply("PID file exists but process is terminated. Cleaning up...")
             self.cleanup(reply)
@@ -399,20 +398,31 @@ class World:
 
     def start(self, *args, **kwargs):
         def feed_commands(java_popen):
+            """This function will run a loop to feed commands sent through the socket to minecraft"""
+            mypid = os.getpid()
             loop_var = True
             with socket.socket(socket.AF_UNIX) as s:
-                # Set 10 minute timeout so that the process actually exits (this is not crucial but we don't want to spam the system)
-                s.settimeout(600)
+                # Set 1 minute timeout so that the process actually exits (this is not crucial but we don't want to spam the system)
+                s.settimeout(60)
                 if self.socket_path.exists():
                     self.socket_path.unlink()
                 s.bind(str(self.socket_path))
+
                 while loop_var and self.socket_path.exists():
+                    if not self.pidrunning(java_popen.pid):
+                        try:
+                            s.shutdown(socket.SHUT_RDWR)
+                            s.close()
+                        except:
+                            pass
+                        return
+
                     str_buffer = ''
                     try:
                         s.listen(1)
                         c, _ = s.accept()
                         while loop_var:
-                            data = c.recv(1024)
+                            data = c.recv(4096)
                             if not data:
                                 break
                             lines = (str_buffer + data.decode('utf-8')).split('\n')
@@ -421,12 +431,20 @@ class World:
                                     loop_var = False
                                     break
                                 java_popen.stdin.write(line.encode('utf-8') + b'\n')
+                                java_popen.stdin.flush()
                             str_buffer = lines[-1]
-                        c.close()
-                        if java_popen.poll() is not None:
-                            return
-                    except socket.timeout:
+                        try:
+                            c.shutdown(socket.SHUT_RDWR)
+                            c.close()
+                        except:
+                            pass
+                    except (socket.timeout, socket.error):
                         continue
+            try:
+                s.shutdown(socket.SHUT_RDWR)
+                s.close()
+            except:
+                pass
             java_popen.communicate(input=b'stop\n')
             if self.socket_path.exists():
                 self.socket_path.unlink()
@@ -451,7 +469,7 @@ class World:
             # make sure the command sockets directory exists
             self.socket_path.parent.mkdir(parents=True)
         if not self.pidfile_path.parent.exists():
-            # make sure the command pidfile directory exists
+            # make sure the pidfile directory exists
             self.pidfile_path.parent.mkdir(parents=True)
 
         java_popen = subprocess.Popen(invocation, stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=str(self.path)) # start the java process
