@@ -68,7 +68,7 @@ DEFAULT_CONFIG = {
     'mainWorld': 'wurstmineberg',
     'paths': {
         'assets': '/var/www/wurstmineberg.de/assets/serverstatus',
-        'backup': '/opt/wurstmineberg/backup',
+        'backup': '/opt/wurstmineberg/backup/worlds',
         'backupWeb': '/var/www/wurstmineberg.de/assets/latestbackup.tar.gz',
         'clientVersions': '/opt/wurstmineberg/home/.minecraft/versions',
         'commandLog': '/opt/wurstmineberg/log/commands.log',
