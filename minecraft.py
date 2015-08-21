@@ -143,7 +143,9 @@ class World:
             # make sure the world backup directory exists
             self.backup_path.mkdir(parents=True)
         subprocess.call(['tar', '-C', str(self.path), '-cf', str(backup_file), self.name]) # tar the world directory (e.g. /opt/wurstmineberg/world/wurstmineberg/wurstmineberg)
-        subprocess.call(['rsync', '-av', '--delete', str(self.path / self.name) + '/', str(self.backup_path / 'latest')])
+        if self.is_main:
+            # make a copy of the world directory for the main world to be used by map rendering
+            subprocess.call(['rsync', '-av', '--delete', str(self.path / self.name) + '/', str(self.backup_path / 'latest')])
         self.save_on(announce=announce, reply=reply)
         reply('Compressing backup...')
         subprocess.call(['gzip', '-f', str(backup_file)])
