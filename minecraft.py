@@ -623,6 +623,14 @@ class World:
         """
         return self.service_path.resolve().stem[len('minecraft_server.'):]
 
+    @property
+    def world_path(self):
+        """Returns the world save directory"""
+        result = self.path / 'world'
+        if not result.exists():
+            return self.path / self.name
+        return result
+
 class MinecraftServerNotRunningError(Exception):
     pass
 
