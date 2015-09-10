@@ -288,13 +288,11 @@ class World:
         try:
             os.kill(pid, signal.SIGTERM)
             for _ in range(60):
-                try:
-                    os.kill(pid, 0)
-                    time.sleep(1)
-                    continue
-                except OSError:
+                live = self.pidrunning(pid)
+                if not live:
                     reply("Terminated world '" + self.name + "'")
                     break
+                time.sleep(1)
             else:
                 reply("Could not terminate with SIGQUIT. Sending SIGKILL to PID " + str(pid) + "...")
                 os.kill(pid, signal.SIGKILL)
@@ -322,6 +320,9 @@ class World:
             return True
         except ProcessLookupError:
             return False
+        except PermissionError:
+            # Process exists but you can't send signals
+            return True
 
     def pidstatus(self, reply=print):
         if self.pidfile_path.exists() and self.pid is not None:
