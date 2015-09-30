@@ -750,7 +750,7 @@ if __name__ == '__main__':
             if arguments['snapshot']:
                 world.update(arguments['<snapshot-id>'], snapshot=True)
             elif arguments['<version>']:
-                world.update(arguments['<snapshot-id>'])
+                world.update(arguments['<version>'])
             else:
                 world.update(snapshot=True)
     elif arguments['backup']:
