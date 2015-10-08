@@ -69,7 +69,7 @@ DEFAULT_CONFIG = {
     'paths': {
         'assets': '/var/www/wurstmineberg.de/assets/serverstatus',
         'backup': '/opt/wurstmineberg/backup/worlds',
-        'backupWeb': '/var/www/wurstmineberg.de/assets/latestbackup.tar.gz',
+        'backupWeb': None,
         'clientVersions': '/opt/wurstmineberg/home/.minecraft/versions',
         'commandLog': '/opt/wurstmineberg/log/commands.log',
         'home': '/opt/wurstmineberg',
@@ -108,7 +108,8 @@ with contextlib.suppress(FileNotFoundError):
     with CONFIG_FILE.open() as config_file:
         CONFIG.update(json.load(config_file))
 for key in CONFIG['paths']:
-    CONFIG['paths'][key] = pathlib.Path(CONFIG['paths'][key])
+    if isinstance(CONFIG['paths'][key], str):
+        CONFIG['paths'][key] = pathlib.Path(CONFIG['paths'][key])
 
 class World:
     def __init__(self, name=None):
@@ -150,7 +151,7 @@ class World:
         reply('Compressing backup...')
         subprocess.call(['gzip', '-f', str(backup_file)])
         backup_file = pathlib.Path(str(backup_file) + '.gz')
-        if self.is_main:
+        if self.is_main and CONFIG['paths']['backupWeb'] is not None:
             reply('Symlinking to httpdocs...')
             if CONFIG['paths']['backupWeb'].is_symlink():
                 CONFIG['paths']['backupWeb'].unlink()
