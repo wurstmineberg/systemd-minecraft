@@ -130,7 +130,7 @@ class World:
         """Back up the Minecraft world.
 
         Optional arguments:
-        announce -- Whether to announce in-game that saves are being disabled/reenabled.
+        announce -- Whether to announce in-game that saves are being disabled/reenabled. Defaults to False.
         reply -- This function is called with human-readable progress updates. Defaults to the built-in print function.
         path -- Where the backup will be saved. The file extension .tar.gz will be appended automatically. Defaults to a file with the world name and a timestamp in the backups directory.
         """
@@ -143,10 +143,10 @@ class World:
         if not self.backup_path.exists():
             # make sure the world backup directory exists
             self.backup_path.mkdir(parents=True)
-        subprocess.call(['tar', '-C', str(self.path), '-cf', str(backup_file), self.name]) # tar the world directory (e.g. /opt/wurstmineberg/world/wurstmineberg/wurstmineberg)
+        subprocess.call(['tar', '-C', str(self.path), '-cf', str(backup_file), self.world_path.name]) # tar the world directory (e.g. /opt/wurstmineberg/world/wurstmineberg/world or /opt/wurstmineberg/world/wurstmineberg/wurstmineberg)
         if self.is_main:
             # make a copy of the world directory for the main world to be used by map rendering
-            subprocess.call(['rsync', '-av', '--delete', str(self.path / self.name) + '/', str(self.backup_path / 'latest')])
+            subprocess.call(['rsync', '-av', '--delete', str(self.world_path) + '/', str(self.backup_path / 'latest')])
         self.save_on(announce=announce, reply=reply)
         reply('Compressing backup...')
         subprocess.call(['gzip', '-f', str(backup_file)])
