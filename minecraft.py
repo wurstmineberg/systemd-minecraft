@@ -146,9 +146,9 @@ class World:
             path = str(path)
         backup_file = pathlib.Path(path + '.tar')
         reply('Backing up minecraft world...')
-        if not self.backup_path.exists():
-            # make sure the world backup directory exists
-            self.backup_path.mkdir(parents=True)
+        if not backup_file.parent.exists():
+            # make sure the backup directory exists
+            backup_file.parent.mkdir(parents=True)
         subprocess.call(['tar', '-C', str(self.path), '-cf', str(backup_file), self.world_path.name]) # tar the world directory (e.g. /opt/wurstmineberg/world/wurstmineberg/world or /opt/wurstmineberg/world/wurstmineberg/wurstmineberg)
         if self.is_main:
             # make a copy of the world directory for the main world to be used by map rendering
