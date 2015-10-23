@@ -15,6 +15,7 @@ Options:
   --all              Apply the action to all configured worlds.
   --config=<config>  Path to the config file [default: /opt/wurstmineberg/config/systemd-minecraft.json].
   --main             Apply the action to the main world. This is the default.
+  --no-backup        Don't back up the world(s) before updating.
   --version          Print version info and exit.
 """
 
@@ -41,6 +42,7 @@ import re
 import requests
 import socket
 import subprocess
+import threading
 import time
 from datetime import timedelta
 from datetime import timezone
@@ -133,11 +135,15 @@ class World:
         announce -- Whether to announce in-game that saves are being disabled/reenabled. Defaults to False.
         reply -- This function is called with human-readable progress updates. Defaults to the built-in print function.
         path -- Where the backup will be saved. The file extension .tar.gz will be appended automatically. Defaults to a file with the world name and a timestamp in the backups directory.
+
+        Returns:
+        A pathlib.Path representing the gzipped backup tarball.
         """
         self.save_off(announce=announce, reply=reply)
         if path is None:
-            now = datetime.utcnow().strftime('%Y-%m-%d_%Hh%M')
-            path = str(self.backup_path / '{}_{}'.format(self.name, now))
+            path = str(self.backup_path / '{}_{:%Y-%m-%d_%Hh%M}'.format(self.name, datetime.utcnow()))
+        else:
+            path = str(path)
         backup_file = pathlib.Path(path + '.tar')
         reply('Backing up minecraft world...')
         if not self.backup_path.exists():
@@ -157,6 +163,7 @@ class World:
                 CONFIG['paths']['backupWeb'].unlink()
             CONFIG['paths']['backupWeb'].symlink_to(backup_file)
         reply('Done.')
+        return backup_file
 
     @property
     def backup_path(self):
@@ -222,16 +229,20 @@ class World:
     def is_main(self):
         return self.name == CONFIG['mainWorld']
 
-    def iter_update(self, version=None, snapshot=False, reply=print, log_path=None, override=False):
+    def iter_update(self, version=None, snapshot=False, *, reply=print, log_path=None, make_backup=True, override=None):
         """Download a different version of Minecraft and restart the world if it is running. Returns a generator where each iteration performs one step of the update process.
 
         Optional arguments:
         version -- If given, a version with this name will be downloaded. By default, the newest available version is downloaded.
         snapshot -- If version is given, this specifies whether the version is a development version. If no version is given, this specifies whether the newest stable version or the newest development version should be downloaded. Defaults to False.
-        reply -- This function is called several times with a string argument representing update progress. Defaults to the built-in print function.
+
+        Keyword-only arguments:
         log_path -- This is passed to the stop and start functions if the server is stopped before the update.
-        override -- If this is True and the server jar for the target version already exists, it will be deleted and redownloaded. Defaults to False.
+        make_backup -- Whether to back up the world before updating. Defaults to True.
+        override -- If this is true and the server jar for the target version already exists, it will be deleted and redownloaded. Defaults to True if the target version is the current version, False otherwise.
+        reply -- This function is called several times with a string argument representing update progress. Defaults to the built-in print function.
         """
+        # get version
         versions_json = requests.get('https://s3.amazonaws.com/Minecraft.Download/versions/versions.json').json()
         if version is None: # try to dynamically get the latest version number from assets
             version = versions_json['latest']['snapshot' if snapshot else 'release']
@@ -250,26 +261,45 @@ class World:
             'is_snapshot': snapshot,
             'version_text': version_text
         }
+        if override is None:
+            override = version == old_version
+        # back up world in background
+        if make_backup:
+            old_version = self.version()
+            backup_path = self.backup_path / 'pre-update' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.utcnow(), re.sub('\\.', '_', old_version), re.sub('\\.', '_', version))
+            backup_thread = threading.Thread(target=self.backup, kwargs={'reply': reply, 'path': backup_path})
+            backup_thread.start()
+        # get server jar
         jar_path = CONFIG['paths']['jar'] / 'minecraft_server.{}.jar'.format(version)
         if override and jar_path.exists():
             jar_path.unlink()
         if not jar_path.exists():
             _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/minecraft_server.{0}.jar'.format(version), local_filename=str(jar_path))
+        # get client jar
         if 'clientVersions' in CONFIG['paths']:
             with contextlib.suppress(FileExistsError):
                 (CONFIG['paths']['clientVersions'] / version).mkdir(parents=True)
             _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/{0}.jar'.format(version), local_filename=str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)))
-        yield 'Download finished. Stopping server...'
+        # wait for backup to finish
+        if make_backup:
+            yield 'Download finished. Waiting for backup to finish...'
+            backup_thread.join()
+            yield 'Backup finished. Stopping server...'
+        else:
+            yield 'Download finished. Stopping server...'
+        # stop server
         was_running = self.status()
         if was_running:
             self.say('Server will be upgrading to ' + version_text + ' and therefore restart')
             time.sleep(5)
             self.stop(reply=reply, log_path=log_path)
         yield 'Server stopped. Installing new server...'
+        # install new server
         if self.service_path.exists():
             self.service_path.unlink()
         self.service_path.symlink_to(CONFIG['paths']['jar'] / 'minecraft_server.{}.jar'.format(version))
         client_jar_path = CONFIG['paths']['home'] / 'home' / 'client.jar'
+        # update Mapcrafter textures
         if self.is_main:
             if client_jar_path.exists():
                 client_jar_path.unlink()
@@ -278,6 +308,7 @@ class World:
                 subprocess.check_call(['mapcrafter_textures.py', str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)), '/usr/local/share/mapcrafter/textures'])
             except Exception as e:
                 reply('Error while updating mapcrafter textures: {}'.format(e))
+        # restart server
         if was_running:
             self.start(reply=reply, start_message='Server updated. Restarting...', log_path=log_path)
 
@@ -539,17 +570,20 @@ class World:
             message_dict = {'text': '', 'extra': message_dict}
         self.command('tellraw', [player, json.dumps(message_dict)])
 
-    def update(self, version=None, snapshot=False, reply=print, log_path=None, override=False):
+    def update(self, version=None, snapshot=False, *, log_path=None, make_backup=True, override=False, reply=print):
         """Download a different version of Minecraft and restart the server if it is running.
 
         Optional arguments:
         version -- If given, a version with this name will be downloaded. By default, the newest available version is downloaded.
         snapshot -- If version is given, this specifies whether the version is a development version. If no version is given, this specifies whether the newest stable version or the newest development version should be downloaded. Defaults to False.
-        reply -- This function is called several times with a string argument representing update progress. Defaults to the built-in print function.
+
+        Keyword-only arguments:
         log_path -- This is passed to the stop function if the server is stopped before the update.
+        make_backup -- Whether to back up the world before updating. Defaults to True.
         override -- If this is True and the server jar for the target version already exists, it will be deleted and redownloaded. Defaults to False.
+        reply -- This function is called several times with a string argument representing update progress. Defaults to the built-in print function.
         """
-        update_iterator = self.iter_update(version=version, snapshot=snapshot, reply=reply, log_path=log_path, override=override)
+        update_iterator = self.iter_update(version=version, snapshot=snapshot, log_path=log_path, make_backup=make_backup, override=override, reply=reply)
         version_dict = next(update_iterator)
         reply('Downloading ' + version_dict['version_text'])
         for message in update_iterator:
@@ -749,9 +783,9 @@ if __name__ == '__main__':
     elif arguments['update'] or arguments['update-all']:
         for world in selected_worlds:
             if arguments['snapshot']:
-                world.update(arguments['<snapshot-id>'], snapshot=True)
+                world.update(arguments['<snapshot-id>'], snapshot=True, make_backup=not arguments['--no-backup'])
             elif arguments['<version>']:
-                world.update(arguments['<version>'])
+                world.update(arguments['<version>'], make_backup=not arguments['--no-backup'])
             else:
                 world.update(snapshot=True)
     elif arguments['backup']:
