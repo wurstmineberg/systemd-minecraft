@@ -15,7 +15,7 @@ Options:
   --all              Apply the action to all configured worlds.
   --config=<config>  Path to the config file [default: /opt/wurstmineberg/config/systemd-minecraft.json].
   --main             Apply the action to the main world. This is the default.
-  --no-backup        Don't back up the world(s) before updating.
+  --no-backup        Don't back up the world(s) before updating/reverting.
   --version          Print version info and exit.
 """
 
