@@ -544,15 +544,19 @@ class World:
             if self.socket_path.exists():
                 self.socket_path.unlink()
 
-        invocation = ['java', '-Xmx' + str(self.config['javaOptions']['maxHeap']) + 'M',
-                              '-Xms' + str(self.config['javaOptions']['minHeap']) + 'M',
-                              '-XX:+UseConcMarkSweepGC',
-                              '-XX:+CMSIncrementalMode',
-                              '-XX:+CMSIncrementalPacing',
-                              '-XX:ParallelGCThreads=' + str(self.config['javaOptions']['cpuCount']),
-                              '-XX:+AggressiveOpts',
-                              '-Dlog4j.configurationFile=' + str(CONFIG['paths']['logConfig']),
-                              '-jar', str(CONFIG['paths']['service'])] + self.config['javaOptions']['jarOptions']
+        invocation = [
+            'java',
+            '-Xmx' + str(self.config['javaOptions']['maxHeap']) + 'M',
+            '-Xms' + str(self.config['javaOptions']['minHeap']) + 'M',
+            '-XX:+UseConcMarkSweepGC',
+            '-XX:+CMSIncrementalMode',
+            '-XX:+CMSIncrementalPacing',
+            '-XX:ParallelGCThreads=' + str(self.config['javaOptions']['cpuCount']),
+            '-XX:+AggressiveOpts',
+            '-Dlog4j.configurationFile=' + str(CONFIG['paths']['logConfig']),
+            '-jar',
+            str(CONFIG['paths']['service'])
+        ] + self.config['javaOptions']['jarOptions']
 
         reply = kwargs.get('reply', print)
         if self.status():
@@ -571,7 +575,7 @@ class World:
         with self.pidfile_path.open("w+") as pidfile:
             pidfile.write(str(java_popen.pid))
         for line in loops.timeout_total(java_popen.stdout, timedelta(seconds=CONFIG['startTimeout'])): # wait until the timeout has been exceeded...
-            if re.match(regexes.full_timestamp + ' \\[Server thread/INFO\\]: Done \\([0-9]+.[0-9]+s\\)!', line.decode('utf-8')): # ...or the server has finished starting
+            if re.match('[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} \\[Server thread/INFO\\]: Done \\([0-9]+.[0-9]+s\\)!', line.decode('utf-8')): # ...or the server has finished starting
                 break
         _fork(feed_commands, java_popen) # feed commands from the socket to java
         _fork(more_itertools.consume, java_popen.stdout) # consume java stdout to prevent deadlocking
@@ -729,29 +733,6 @@ class World:
 
 class MinecraftServerNotRunningError(Exception):
     pass
-
-class regexes:
-    full_timestamp = '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}'
-    player = '[A-Za-z0-9_]{1,16}'
-    prefix = '\\[(.+?)\\]:?'
-    timestamp = '\\[[0-9]{2}:[0-9]{2}:[0-9]{2}\\]'
-
-    @staticmethod
-    def strptime(base_date, timestamp, tzinfo=timezone.utc):
-        # return aware datetime object from log timestamp
-        if isinstance(base_date, str):
-            offset = tzinfo.utcoffset(datetime.now())
-            if offset < timedelta():
-                prefix = '-'
-                offset *= -1
-            else:
-                prefix = '+'
-            timezone_string = prefix + str(offset // timedelta(hours=1)).rjust(2, '0') + str(offset // timedelta(minutes=1) % 60).rjust(2, '0')
-            return datetime.strptime(base_date + timestamp + timezone_string, '%Y-%m-%d[%H:%M:%S]%z')
-        hour = int(timestamp[1:3])
-        minute = int(timestamp[4:6])
-        second = int(timestamp[7:9])
-        return datetime.combine(base_date, dtime(hour=hour, minute=minute, second=second, tzinfo=tzinfo))
 
 def _command_output(cmd, args=[]):
     p = subprocess.Popen([cmd] + args, stdout=subprocess.PIPE)
