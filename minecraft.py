@@ -384,7 +384,7 @@ class World:
         return self.start(*args, **kwargs)
 
     def revert(self, path_or_version=None, snapshot=False, *, log_path=None, make_backup=True, override=False, reply=print):
-        """Download a different version of Minecraft and restart the server if it is running.
+        """Revert to a different version of Minecraft and restore a pre-update backup.
 
         Optional arguments:
         path_or_version -- If given, a pathlib.Path pointing at the backup file to be restored, or the Minecraft version to which to restore. By default, the newest available pre-update backup is restored.
