@@ -399,10 +399,10 @@ class World:
         # determine version and backup path
         if path_or_version is None:
             path = sorted((self.backup_path / 'pre-update').iterdir(), key=lambda path: path.stat().st_mtime, reverse=True)[0] # latest pre-update backup
-            version = path.name.split('_')[2]
+            version = path.name.split('_')[3]
         elif isinstance(path_or_version, pathlib.Path):
             path = path_or_version
-            version = path.name.split('_')[2]
+            version = path.name.split('_')[3]
         else:
             version = path_or_version
             if snapshot and len(version) == 1:
