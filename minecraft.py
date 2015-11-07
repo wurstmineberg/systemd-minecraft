@@ -407,7 +407,7 @@ class World:
             version = path_or_version
             if snapshot and len(version) == 1:
                 version = datetime.utcnow().strftime('%yw%V') + version
-            path = next(path for path in sorted((self.backup_path / 'pre-update').iterdir(), key=lambda path: path.stat().st_mtime, reverse=True) if path.name.split('_')[2] == version)
+            path = next(path for path in sorted((self.backup_path / 'pre-update').iterdir(), key=lambda path: path.stat().st_mtime, reverse=True) if path.name.split('_')[3] == version)
         # start iter_update
         update_iterator = self.iter_update(version, log_path=log_path, make_backup=False, override=override, reply=reply)
         version_dict = next(update_iterator)
