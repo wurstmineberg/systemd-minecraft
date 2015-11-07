@@ -4,7 +4,7 @@
 
 Usage:
   minecraft [options] (start | stop | kill | restart | status | backup) [<world>...]
-  minecraft [options] update [<world> [snapshot <snapshot-id> | <version>]]
+  minecraft [options] (update | revert) [<world> [snapshot <snapshot-id> | <version>]]
   minecraft [options] update-all [snapshot <snapshot-id> | <version>]
   minecraft [options] command <world> <command>...
   minecraft -h | --help
@@ -40,6 +40,7 @@ import pathlib
 import pwd
 import re
 import requests
+import shutil
 import socket
 import subprocess
 import threading
@@ -128,7 +129,7 @@ class World:
     def __str__(self):
         return self.name
 
-    def backup(self, announce=False, reply=print, path=None):
+    def backup(self, announce=False, reply=print, path=None, *, copy_to_latest=None):
         """Back up the Minecraft world.
 
         Optional arguments:
@@ -136,9 +137,14 @@ class World:
         reply -- This function is called with human-readable progress updates. Defaults to the built-in print function.
         path -- Where the backup will be saved. The file extension .tar.gz will be appended automatically. Defaults to a file with the world name and a timestamp in the backups directory.
 
+        Keyword-only arguments:
+        copy_to_latest -- Whether to create or update the copy of the world directory at backups/latest. Defaults to True for the main world and to False for all other worlds.
+
         Returns:
         A pathlib.Path representing the gzipped backup tarball.
         """
+        if copy_to_latest is None:
+            copy_to_latest = self.is_main
         self.save_off(announce=announce, reply=reply)
         if path is None:
             path = str(self.backup_path / '{}_{:%Y-%m-%d_%Hh%M}'.format(self.name, datetime.utcnow()))
@@ -150,7 +156,7 @@ class World:
             # make sure the backup directory exists
             backup_file.parent.mkdir(parents=True)
         subprocess.call(['tar', '-C', str(self.path), '-cf', str(backup_file), self.world_path.name]) # tar the world directory (e.g. /opt/wurstmineberg/world/wurstmineberg/world or /opt/wurstmineberg/world/wurstmineberg/wurstmineberg)
-        if self.is_main:
+        if copy_to_latest:
             # make a copy of the world directory for the main world to be used by map rendering
             subprocess.call(['rsync', '-av', '--delete', str(self.world_path) + '/', str(self.backup_path / 'latest')])
         self.save_on(announce=announce, reply=reply)
@@ -266,7 +272,7 @@ class World:
         # back up world in background
         if make_backup:
             old_version = self.version()
-            backup_path = self.backup_path / 'pre-update' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.utcnow(), re.sub('\\.', '_', old_version), re.sub('\\.', '_', version))
+            backup_path = self.backup_path / 'pre-update' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.utcnow(), old_version, version)
             backup_thread = threading.Thread(target=self.backup, kwargs={'reply': reply, 'path': backup_path})
             backup_thread.start()
         # get server jar
@@ -375,6 +381,60 @@ class World:
             return False
         kwargs['start_message'] = kwargs.get('start_message', 'Server stopped. Restarting...')
         return self.start(*args, **kwargs)
+
+    def revert(self, path_or_version=None, snapshot=False, *, log_path=None, make_backup=True, override=False, reply=print):
+        """Download a different version of Minecraft and restart the server if it is running.
+
+        Optional arguments:
+        path_or_version -- If given, a pathlib.Path pointing at the backup file to be restored, or the Minecraft version to which to restore. By default, the newest available pre-update backup is restored.
+        snapshot -- If true, single-letter Minecraft versions will be expanded to include the current year and week number. Defaults to False.
+
+        Keyword-only arguments:
+        log_path -- This is passed to the stop function if the server is stopped before the revert.
+        make_backup -- Whether to back up the world before reverting. Defaults to True.
+        override -- If this is True and the server jar for the target version already exists, it will be deleted and redownloaded. Defaults to False.
+        reply -- This function is called several times with a string argument representing revert progress. Defaults to the built-in print function.
+        """
+        # determine version and backup path
+        if path_or_version is None:
+            path = sorted((self.backup_path / 'pre-update').iterdir(), key=lambda path: path.stat().st_mtime, reverse=True)[0] # latest pre-update backup
+            version = path.name.split('_')[2]
+        elif isinstance(path_or_version, pathlib.Path):
+            path = path_or_version
+            version = path.name.split('_')[2]
+        else:
+            version = path_or_version
+            if snapshot and len(version) == 1:
+                version = datetime.utcnow().strftime('%yw%V') + version
+            path = next(path for path in sorted((self.backup_path / 'pre-update').iterdir(), key=lambda path: path.stat().st_mtime, reverse=True) if path.name.split('_')[2] == version)
+        # start iter_update
+        update_iterator = self.iter_update(version, log_path=log_path, make_backup=False, override=override, reply=reply)
+        version_dict = next(update_iterator)
+        reply('Downloading ' + version_dict['version_text'])
+        # make a backup to backup/<world>/reverted
+        if make_backup:
+            old_version = self.version()
+            backup_path = self.backup_path / 'reverted' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.utcnow(), old_version, version)
+            self.backup(reply=reply, path=backup_path, copy_to_latest=False)
+        # stop the server
+        was_running = self.status()
+        if was_running:
+            self.say('Server will be reverting to ' + version_text + ' and therefore restart')
+            time.sleep(5)
+            self.stop(reply=reply, log_path=log_path)
+        yield 'Server stopped. Restoring backup...'
+        # revert Minecraft version
+        for message in update_iterator:
+            reply(message)
+        # restore backup
+        world_path = self.world_path
+        if world_path.exists():
+            shutil.rmtree(str(world_path))
+        subprocess.call(['tar', '-C', str(self.path), '-xzf', str(path), world_path.name]) # untar tar the world backup
+        # restart server
+        if was_running:
+            self.start(reply=reply, start_message='Server reverted. Restarting...', log_path=log_path)
+        return version_dict['version'], version_dict['is_snapshot'], version_dict['version_text']
 
     def save_off(self, announce=True, reply=print):
         """Turn off automatic world saves, then force-save once.
@@ -788,6 +848,14 @@ if __name__ == '__main__':
                 world.update(arguments['<version>'], make_backup=not arguments['--no-backup'])
             else:
                 world.update(snapshot=True)
+    elif arguments['revert']:
+        for world in selected_worlds:
+            if arguments['snapshot']:
+                world.revert(arguments['<snapshot-id>'], snapshot=True, make_backup=not arguments['--no-backup'])
+            elif arguments['<version>']:
+                world.revert(arguments['<version>'], make_backup=not arguments['--no-backup'])
+            else:
+                world.revert()
     elif arguments['backup']:
         for world in selected_worlds:
             world.backup()
