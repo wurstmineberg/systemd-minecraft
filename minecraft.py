@@ -14,6 +14,7 @@ Options:
   -h, --help         Print this message and exit.
   --all              Apply the action to all configured worlds.
   --config=<config>  Path to the config file [default: /opt/wurstmineberg/config/systemd-minecraft.json].
+  --enabled          Apply the action to all enabled worlds. This option is intended to be used only by the service file, to automatically start all enabled worlds on boot.
   --main             Apply the action to the main world. This is the default.
   --no-backup        Don't back up the world(s) before updating/reverting.
   --version          Print version info and exit.
@@ -792,6 +793,8 @@ if __name__ == '__main__':
         sys.exit('[!!!!] Only the user ‘wurstmineberg’ may use this program!')
     if arguments['--all'] or arguments['update-all']:
         selected_worlds = worlds()
+    elif arguments['--enabled']:
+        selected_worlds = filter(lambda world: world.config['enabled'], worlds())
     elif arguments['<world>']:
         selected_worlds = (World(world_name) for world_name in arguments['<world>'])
     else:
@@ -804,9 +807,8 @@ if __name__ == '__main__':
                 sys.exit('[WARN] Could not kill the "{}" world, PID file does not exist.'.format(world))
     if arguments['start']:
         for world in selected_worlds:
-            if world.config['enabled']:
-                if not world.start():
-                    sys.exit('[FAIL] Error! Could not start the {} world.'.format(world))
+            if not world.start():
+                sys.exit('[FAIL] Error! Could not start the {} world.'.format(world))
         else:
             print('[ ok ] Minecraft is now running.')
     elif arguments['stop']:
