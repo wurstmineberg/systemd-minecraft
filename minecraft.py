@@ -423,7 +423,7 @@ class World:
             self.say('Server will be reverting to ' + version_text + ' and therefore restart')
             time.sleep(5)
             self.stop(reply=reply, log_path=log_path)
-        yield 'Server stopped. Restoring backup...'
+        reply('Server stopped. Restoring backup...')
         # revert Minecraft version
         for message in update_iterator:
             reply(message)
