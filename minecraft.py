@@ -881,3 +881,5 @@ if __name__ == '__main__':
             cmdlog = world.command(arguments['<command>'][0], arguments['<command>'][1:])
             for line in cmdlog.splitlines():
                 print(str(line))
+    else:
+        raise NotImplementedError('Subcommand not implemented')
