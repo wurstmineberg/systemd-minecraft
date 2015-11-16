@@ -6,7 +6,7 @@ Usage:
   minecraft [options] (start | stop | kill | restart | status | backup) [<world>...]
   minecraft [options] (update | revert) [<world> [snapshot <snapshot-id> | <version>]]
   minecraft [options] update-all [snapshot <snapshot-id> | <version>]
-  minecraft [options] command <world> <command>...
+  minecraft [options] command <world> [--] <command>...
   minecraft -h | --help
   minecraft --version
 
