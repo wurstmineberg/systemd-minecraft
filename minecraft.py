@@ -224,6 +224,7 @@ class World:
     @property
     def config(self):
         ret = {
+            'customServer': CONFIG['worlds'][self.name].get('customServer', False),
             'enabled': CONFIG['worlds'][self.name].get('enabled', False),
             'javaOptions': CONFIG['javaOptions'].copy(),
             'whitelist': CONFIG['whitelist'].copy()
@@ -647,7 +648,15 @@ class World:
         make_backup -- Whether to back up the world before updating. Defaults to True.
         override -- If this is True and the server jar for the target version already exists, it will be deleted and redownloaded. Defaults to False.
         reply -- This function is called several times with a string argument representing update progress. Defaults to the built-in print function.
+
+        Returns:
+        The new version, a boolean indicating whether or not the new version is a snapshot (or pre-release), and the full name of the new version.
+
+        Raises:
+        NotImplementedError -- For worlds with custom servers.
         """
+        if self.config['customServer']:
+            raise NotImplementedError('Update is not implemented for worlds with custom servers')
         update_iterator = self.iter_update(version=version, snapshot=snapshot, log_path=log_path, make_backup=make_backup, override=override, reply=reply)
         version_dict = next(update_iterator)
         reply('Downloading ' + version_dict['version_text'])
@@ -720,8 +729,10 @@ class World:
                     person['minecraftUUID'] = whitelist_entry['uuid']
 
     def version(self):
-        """Returns the version of Minecraft the world is currently configured to run.
+        """Returns the version of Minecraft the world is currently configured to run. For worlds with custom servers, returns None instead.
         """
+        if self.config['customServer']:
+            return None
         return self.service_path.resolve().stem[len('minecraft_server.'):]
 
     @property
