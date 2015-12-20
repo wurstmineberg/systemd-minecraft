@@ -5,6 +5,7 @@
 Usage:
   minecraft [options] (start | stop | kill | restart | status | backup) [<world>...]
   minecraft [options] (update | revert) [<world> [snapshot <snapshot-id> | <version>]]
+  minecraft [options] saves (on | off) [<world>...]
   minecraft [options] update-all [snapshot <snapshot-id> | <version>]
   minecraft [options] command <world> [--] <command>...
   minecraft -h | --help
@@ -875,5 +876,13 @@ if __name__ == '__main__':
             cmdlog = world.command(arguments['<command>'][0], arguments['<command>'][1:])
             for line in cmdlog.splitlines():
                 print(str(line))
+    elif arguments['saves']:
+        for world in selected_worlds:
+            if arguments['on']:
+                world.save_on()
+            elif arguments['off']:
+                world.save_off()
+            else:
+                raise NotImplementedError('Subcommand not implemented')
     else:
         raise NotImplementedError('Subcommand not implemented')
