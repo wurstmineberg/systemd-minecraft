@@ -252,7 +252,7 @@ class World:
         reply -- This function is called several times with a string argument representing update progress. Defaults to the built-in print function.
         """
         # get version
-        versions_json = requests.get('https://s3.amazonaws.com/Minecraft.Download/versions/versions.json').json()
+        versions_json = requests.get('https://launchermeta.mojang.com/mc/game/version_manifest.json').json()
         if version is None: # try to dynamically get the latest version number from assets
             version = versions_json['latest']['snapshot' if snapshot else 'release']
         elif snapshot:
@@ -288,7 +288,7 @@ class World:
         if 'clientVersions' in CONFIG['paths']:
             with contextlib.suppress(FileExistsError):
                 (CONFIG['paths']['clientVersions'] / version).mkdir(parents=True)
-            _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/{0}.jar'.format(version), local_filename=str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)))
+            _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/{0}.jar'.format(version) if version_dict is None or 'url' not in version_dict else version_dict['url'], local_filename=str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)))
         # wait for backup to finish
         if make_backup:
             yield 'Download finished. Waiting for backup to finish...'
