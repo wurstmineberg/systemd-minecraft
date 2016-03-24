@@ -272,6 +272,10 @@ class World:
         }
         if override is None:
             override = version == old_version
+        if version_dict is not None and 'url' in version_dict:
+            version_json = requests.get(version_dict['url']).json()
+        else:
+            version_json = None
         # back up world in background
         if make_backup:
             old_version = self.version()
@@ -288,7 +292,7 @@ class World:
         if 'clientVersions' in CONFIG['paths']:
             with contextlib.suppress(FileExistsError):
                 (CONFIG['paths']['clientVersions'] / version).mkdir(parents=True)
-            _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/{0}.jar'.format(version) if version_dict is None or 'url' not in version_dict else version_dict['url'], local_filename=str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)))
+            _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/{0}.jar'.format(version) if version_json is None else version_json['downloads']['client']['url'], local_filename=str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)))
         # wait for backup to finish
         if make_backup:
             yield 'Download finished. Waiting for backup to finish...'
