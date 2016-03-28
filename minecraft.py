@@ -90,6 +90,7 @@ DEFAULT_CONFIG = {
     },
     'serviceName': 'minecraft_server.jar',
     'startTimeout': 60,
+    'updateMapcrafterTextures': False,
     'whitelist': {
         'additional': [],
         'enabled': True,
@@ -317,10 +318,11 @@ class World:
             if client_jar_path.exists():
                 client_jar_path.unlink()
             client_jar_path.symlink_to(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version))
-            try:
-                subprocess.check_call(['mapcrafter_textures.py', str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)), '/usr/local/share/mapcrafter/textures'])
-            except Exception as e:
-                reply('Error while updating mapcrafter textures: {}'.format(e))
+            if CONFIG['updateMapcrafterTextures']:
+                try:
+                    subprocess.check_call(['mapcrafter_textures.py', str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)), '/usr/local/share/mapcrafter/textures'])
+                except Exception as e:
+                    reply('Error while updating mapcrafter textures: {}'.format(e))
         # restart server
         if was_running:
             self.start(reply=reply, start_message='Server updated. Restarting...', log_path=log_path)
