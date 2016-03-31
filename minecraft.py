@@ -271,6 +271,7 @@ class World:
             'is_snapshot': snapshot,
             'version_text': version_text
         }
+        old_version = self.version()
         if override is None:
             override = version == old_version
         if version_dict is not None and 'url' in version_dict:
@@ -279,7 +280,6 @@ class World:
             version_json = None
         # back up world in background
         if make_backup:
-            old_version = self.version()
             backup_path = self.backup_path / 'pre-update' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.utcnow(), old_version, version)
             backup_thread = threading.Thread(target=self.backup, kwargs={'reply': reply, 'path': backup_path})
             backup_thread.start()
