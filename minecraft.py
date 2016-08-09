@@ -26,10 +26,8 @@ import sys
 sys.path.append('/opt/py')
 
 import contextlib
-from datetime import date
-from datetime import datetime
-from docopt import docopt
-from datetime import time as dtime
+import datetime
+import docopt
 import errno
 import gzip
 import json
@@ -47,8 +45,6 @@ import socket
 import subprocess
 import threading
 import time
-from datetime import timedelta
-from datetime import timezone
 import urllib.parse
 
 def parse_version_string():
@@ -106,7 +102,7 @@ DEFAULT_CONFIG = {
 CONFIG_FILE = pathlib.Path('/opt/wurstmineberg/config/systemd-minecraft.json')
 
 if __name__ == '__main__':
-    arguments = docopt(__doc__, version='Minecraft init script ' + __version__)
+    arguments = docopt.docopt(__doc__, version='Minecraft init script ' + __version__)
     CONFIG_FILE = pathlib.Path(arguments['--config'])
 
 CONFIG = DEFAULT_CONFIG.copy()
@@ -150,7 +146,7 @@ class World:
             copy_to_latest = self.is_main
         self.save_off(announce=announce, reply=reply)
         if path is None:
-            path = str(self.backup_path / '{}_{:%Y-%m-%d_%Hh%M}'.format(self.name, datetime.utcnow()))
+            path = str(self.backup_path / '{}_{:%Y-%m-%d_%Hh%M}'.format(self.name, datetime.datetime.utcnow()))
         else:
             path = str(path)
         backup_file = pathlib.Path(path + '.tar')
@@ -257,7 +253,7 @@ class World:
         if version is None: # try to dynamically get the latest version number from assets
             version = versions_json['latest']['snapshot' if snapshot else 'release']
         elif snapshot:
-            version = datetime.utcnow().strftime('%yw%V') + version
+            version = datetime.datetime.utcnow().strftime('%yw%V') + version
         for version_dict in versions_json['versions']:
             if version_dict.get('id') == version:
                 snapshot = version_dict.get('type') == 'snapshot'
@@ -280,7 +276,7 @@ class World:
             version_json = None
         # back up world in background
         if make_backup:
-            backup_path = self.backup_path / 'pre-update' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.utcnow(), old_version, version)
+            backup_path = self.backup_path / 'pre-update' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.datetime.utcnow(), old_version, version)
             backup_thread = threading.Thread(target=self.backup, kwargs={'reply': reply, 'path': backup_path})
             backup_thread.start()
         # get server jar
@@ -414,7 +410,7 @@ class World:
         else:
             version = path_or_version
             if snapshot and len(version) == 1:
-                version = datetime.utcnow().strftime('%yw%V') + version
+                version = datetime.datetime.utcnow().strftime('%yw%V') + version
             path = next(path for path in sorted((self.backup_path / 'pre-update').iterdir(), key=lambda path: path.stat().st_mtime, reverse=True) if path.name.split('_')[3] == version)
         # start iter_update
         update_iterator = self.iter_update(version, log_path=log_path, make_backup=False, override=override, reply=reply)
@@ -423,7 +419,7 @@ class World:
         # make a backup to backup/<world>/reverted
         if make_backup:
             old_version = self.version()
-            backup_path = self.backup_path / 'reverted' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.utcnow(), old_version, version)
+            backup_path = self.backup_path / 'reverted' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.datetime.utcnow(), old_version, version)
             self.backup(reply=reply, path=backup_path, copy_to_latest=False)
         # stop the server
         was_running = self.status()
@@ -583,7 +579,7 @@ class World:
         java_popen = subprocess.Popen(invocation, stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=str(self.path)) # start the java process
         with self.pidfile_path.open("w+") as pidfile:
             pidfile.write(str(java_popen.pid))
-        for line in loops.timeout_total(java_popen.stdout, timedelta(seconds=CONFIG['startTimeout'])): # wait until the timeout has been exceeded...
+        for line in loops.timeout_total(java_popen.stdout, datetime.timedelta(seconds=CONFIG['startTimeout'])): # wait until the timeout has been exceeded...
             if re.match('[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} \\[Server thread/INFO\\]: Done \\([0-9]+.[0-9]+s\\)!', line.decode('utf-8')): # ...or the server has finished starting
                 break
         _fork(feed_commands, java_popen) # feed commands from the socket to java
@@ -591,7 +587,7 @@ class World:
         if kwargs.get('log_path'):
             with (kwargs['log_path'].open('a') if hasattr(kwargs['log_path'], 'open') else open(kwargs['log_path'], 'a')) as logins_log:
                 ver = self.version()
-                print(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + (' @restart' if ver is None else ' @start ' + ver), file=logins_log) # logs in UTC
+                print(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + (' @restart' if ver is None else ' @start ' + ver), file=logins_log) # logs in UTC
 
         # Wait for the socket listener to spin up
         for _ in range(20):
@@ -627,7 +623,7 @@ class World:
                     return self.kill()
                 if kwargs.get('log_path'):
                     with (kwargs['log_path'].open('a') if hasattr(kwargs['log_path'], 'open') else open(kwargs['log_path'], 'a')) as logins_log:
-                        print(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + ' @stop', file=logins_log) # logs in UTC
+                        print(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + ' @stop', file=logins_log) # logs in UTC
             except ConnectionRefusedError:
                 reply("Can't communicate with the socket. We need to kill the server...")
                 return self.kill()
