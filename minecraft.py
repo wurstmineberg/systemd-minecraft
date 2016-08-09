@@ -637,6 +637,13 @@ class World:
             message_dict = {'text': message_dict}
         elif isinstance(message_dict, list):
             message_dict = {'text': '', 'extra': message_dict}
+        try:
+            import api.util2
+        except ImportError:
+            pass # no support for Player objects
+        else:
+            if isinstance(player, api.util2.Player):
+                player = player.data['minecraft']['nicks'][-1]
         self.command('tellraw', [player, json.dumps(message_dict)])
 
     def update(self, version=None, snapshot=False, *, log_path=None, make_backup=True, override=False, reply=print):
