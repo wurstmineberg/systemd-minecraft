@@ -32,6 +32,7 @@ import errno
 import gzip
 import json
 import loops
+import mcrcon
 import more_itertools
 import os
 import signal
@@ -186,30 +187,20 @@ class World:
 
         Raises:
         MinecraftServerNotRunningError -- If the world is not running and block is set to False.
-        socket.error -- If the world is running but the command socket is disconnected.
+        socket.error -- If the world is running but the RCON connection failed.
         """
-        def file_len(file): #FROM http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
-            for i, l in enumerate(file):
-                pass
-            return i + 1
+        while not self.status():
+            if block:
+                time.sleep(1)
+            else:
+                raise MinecraftServerNotRunningError('')
 
-        if (not block) and not self.status():
-            raise MinecraftServerNotRunningError('')
-        try:
-            with (self.path / 'logs' / 'latest.log').open() as logfile:
-                pre_log_len = file_len(logfile)
-        except (IOError, OSError):
-            pre_log_len = 0
-        except:
-            pre_log_len = None
         cmd += (' ' + ' '.join(str(arg) for arg in args)) if len(args) else ''
-        with socket.socket(socket.AF_UNIX) as s:
-            s.connect(str(self.socket_path))
-            s.sendall(cmd.encode('utf-8') + b'\n')
-        if pre_log_len is None:
-            return None
-        time.sleep(0.2) # assumes that the command will run and print to the log file in less than .2 seconds
-        return _command_output('tail', ['-n', '+' + str(pre_log_len + 1), str(self.path / 'logs' / 'latest.log')])
+
+        rcon = mcrcon.MCRcon()
+        rcon.connect('localhost', 25575)
+        rcon.login(self.config()['rconPassword'])
+        return rcon.command(cmd)
 
     def cleanup(self, reply=print):
         if self.pidfile_path.exists():

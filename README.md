@@ -10,9 +10,10 @@ Requirements
 *   The current version of the Minecraft server, available from [here][MinecraftDownload] or using the `minecraft update` command.
 *   [docopt][Docopt]
 *   [lazyjson][LazyJSON] 1.0 (for whitelist management)
-*   [loops][PythonLoops] 1.1 (for server start)
+*   [mcrcon][MCRCON]
+*   [loops][PythonLoops] 1.1
 *   [more-itertools][MoreItertools] 2.1
-*   [requests][Requests] 2.1 (for updating and whitelist management)
+*   [requests][Requests] 2.1
 
 Configuration
 =============
@@ -26,6 +27,7 @@ To make this work for another server, you may have to modify the paths and other
 
 [Docopt]: https://github.com/docopt/docopt (github: docopt: docopt)
 [LazyJSON]: https://github.com/fenhl/lazyjson (github: fenhl: lazyjson)
+[MCRCON]: https://github.com/barneygale/MCRcon (github: barneygale: MCRcon)
 [Minecraft]: http://minecraft.net/ (Minecraft)
 [MinecraftDownload]: https://minecraft.net/download (Minecraft: Download)
 [MoreItertools]: http://pypi.python.org/pypi/more-itertools (PyPI: more-itertools)
