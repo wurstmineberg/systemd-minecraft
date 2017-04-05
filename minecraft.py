@@ -545,8 +545,6 @@ class World:
             '-Xmx' + str(self.config['javaOptions']['maxHeap']) + 'M',
             '-Xms' + str(self.config['javaOptions']['minHeap']) + 'M',
             '-XX:+UseConcMarkSweepGC',
-            '-XX:+CMSIncrementalMode',
-            '-XX:+CMSIncrementalPacing',
             '-XX:ParallelGCThreads=' + str(self.config['javaOptions']['cpuCount']),
             '-XX:+AggressiveOpts',
             '-Dlog4j.configurationFile=' + str(CONFIG['paths']['logConfig']),
