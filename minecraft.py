@@ -198,7 +198,7 @@ class World:
         cmd += (' ' + ' '.join(str(arg) for arg in args)) if len(args) else ''
 
         rcon = mcrcon.MCRcon()
-        rcon.connect('localhost', self.config.get('rconPort', 25575))
+        rcon.connect('localhost', self.config['rconPort'])
         rcon.login(self.config['rconPassword'])
         return rcon.command(cmd)
 
@@ -216,6 +216,8 @@ class World:
             'customServer': CONFIG['worlds'][self.name].get('customServer', False),
             'enabled': CONFIG['worlds'][self.name].get('enabled', False),
             'javaOptions': CONFIG['javaOptions'].copy(),
+            'rconPassword': CONFIG['worlds'][self.name].get('rconPassword'),
+            'rconPort': CONFIG['worlds'][self.name].get('rconPort', 25575),
             'whitelist': CONFIG['whitelist'].copy()
         }
         ret['javaOptions'].update(CONFIG['worlds'][self.name].get('javaOptions', {}))
