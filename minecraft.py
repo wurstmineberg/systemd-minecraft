@@ -595,6 +595,9 @@ class World:
             try:
                 reply('SERVER SHUTTING DOWN IN 10 SECONDS. Saving map...')
                 notice = kwargs.get('notice', 'SERVER SHUTTING DOWN IN 10 SECONDS. Saving map...')
+                if 'rconPassword' not in self.config:
+                    reply('Cannot communicate with the world, missing RCON password! Killing...')
+                    return self.kill()
                 if notice is not None:
                     self.say(str(notice))
                 self.command('save-all')
