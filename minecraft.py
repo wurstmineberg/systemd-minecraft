@@ -198,8 +198,8 @@ class World:
         cmd += (' ' + ' '.join(str(arg) for arg in args)) if len(args) else ''
 
         rcon = mcrcon.MCRcon()
-        rcon.connect('localhost', 25575)
-        rcon.login(self.config()['rconPassword'])
+        rcon.connect('localhost', self.config.get('rconPort', 25575))
+        rcon.login(self.config['rconPassword'])
         return rcon.command(cmd)
 
     def cleanup(self, reply=print):
