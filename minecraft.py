@@ -818,7 +818,7 @@ if __name__ == '__main__':
                 world.kill()
             else:
                 sys.exit('[WARN] Could not kill the "{}" world, PID file does not exist.'.format(world))
-    if arguments['start']:
+    elif arguments['start']:
         for world in selected_worlds:
             if not world.start():
                 sys.exit('[FAIL] Error! Could not start the {} world.'.format(world))
