@@ -16,6 +16,7 @@ setuptools.setup(
         'requests'
     ],
     dependency_links=[
-        'git+https://github.com/fenhl/python-loops.git#egg=loops'
+        'git+https://github.com/fenhl/python-loops.git#egg=loops',
+        'git+https://github.com/wurstmineberg/MCRcon.git#egg=mcrcon'
     ]
 )
