@@ -58,7 +58,10 @@ def parse_version_string():
                     return line.split(' ')[3]
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=str(path)).decode('utf-8').strip('\n')
 
-__version__ = str(parse_version_string())
+try:
+    __version__ = str(parse_version_string())
+except:
+    __version__ = None
 
 DEFAULT_CONFIG = {
     'javaOptions': {
