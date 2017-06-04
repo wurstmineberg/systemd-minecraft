@@ -60,57 +60,17 @@ def parse_version_string():
                     return line.split(' ')[3]
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=str(path)).decode('utf-8').strip('\n')
 
-__version__ = str(parse_version_string())
+try:
+    __version__ = str(parse_version_string())
+except subprocess.CalledProcessError:
+    __version__ = "3.1.0"
 
-DEFAULT_CONFIG = {
-    'javaOptions': {
-        'cpuCount': 1,
-        'jarOptions': ['nogui'],
-        'maxHeap': 4096,
-        'minHeap': 2048
-    },
-    'mainWorld': 'wurstmineberg',
-    'paths': {
-        'assets': '/var/www/wurstmineberg.de/assets/serverstatus',
-        'backup': '/opt/wurstmineberg/backup/worlds',
-        'backupWeb': None,
-        'clientVersions': '/opt/wurstmineberg/home/.minecraft/versions',
-        'commandLog': '/opt/wurstmineberg/log/commands.log',
-        'home': '/opt/wurstmineberg',
-        'httpDocs': '/var/www/wurstmineberg.de',
-        'jar': '/opt/wurstmineberg/jar',
-        'log': '/opt/wurstmineberg/log',
-        'logConfig': 'log4j2.xml',
-        'people': '/opt/wurstmineberg/config/people.json',
-        'pidfiles': '/var/local/wurstmineberg/pidfiles',
-        'service': 'minecraft_server.jar',
-        'sockets': '/var/local/wurstmineberg/minecraft_commands',
-        'worlds': '/opt/wurstmineberg/world'
-    },
-    'serviceName': 'minecraft_server.jar',
-    'startTimeout': 60,
-    'whitelist': {
-        'additional': [],
-        'enabled': True,
-        'ignorePeople': False
-    },
-    'worlds': {
-        'wurstmineberg': {
-            'enabled': True
-        }
-    }
-}
-
-CONFIG_FILE = pathlib.Path('/opt/wurstmineberg/config/systemd-minecraft.json')
+from wmb import get_config, from_assets
+CONFIG = get_config("systemd-minecraft", base = from_assets(__file__))
 
 if __name__ == '__main__':
     arguments = docopt(__doc__, version='Minecraft init script ' + __version__)
-    CONFIG_FILE = pathlib.Path(arguments['--config'])
 
-CONFIG = DEFAULT_CONFIG.copy()
-with contextlib.suppress(FileNotFoundError):
-    with CONFIG_FILE.open() as config_file:
-        CONFIG.update(json.load(config_file))
 for key in CONFIG['paths']:
     if isinstance(CONFIG['paths'][key], str):
         CONFIG['paths'][key] = pathlib.Path(CONFIG['paths'][key])
@@ -786,11 +746,12 @@ def worlds():
 
 if __name__ == '__main__':
     try:
-        wurstmineberg_user = pwd.getpwnam('wurstmineberg')
+        expect_user = CONFIG["runUser"]
+        wurstmineberg_user = pwd.getpwnam(expect_user)
     except:
-        sys.exit('[!!!!] User ‘wurstmineberg’ does not exist!')
+        sys.exit('[!!!!] User ‘{}’ does not exist!'.format(expect_user))
     if os.geteuid() != wurstmineberg_user.pw_uid:
-        sys.exit('[!!!!] Only the user ‘wurstmineberg’ may use this program!')
+        sys.exit('[!!!!] Only the user ‘{}’ may use this program!'.format(expect_user))
     if arguments['--all'] or arguments['update-all']:
         selected_worlds = worlds()
     elif arguments['--enabled']:

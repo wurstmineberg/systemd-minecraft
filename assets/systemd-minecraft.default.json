@@ -1,0 +1,39 @@
+{
+    "javaOptions": {
+        "cpuCount": 1,
+        "jarOptions": ["nogui"],
+        "maxHeap": 4096,
+        "minHeap": 2048
+    },
+    "mainWorld": "wurstmineberg",
+    "paths": {
+        "assets": "/var/www/wurstmineberg.de/assets/serverstatus",
+        "backup": "/opt/wurstmineberg/backup/worlds",
+        "backupWeb": null,
+        "clientVersions": "/opt/wurstmineberg/home/.minecraft-wurstmineberg/versions",
+        "commandLog": "/opt/wurstmineberg/log/commands.log",
+        "home": "/opt/wurstmineberg",
+        "httpDocs": "/var/www/wurstmineberg.de",
+        "jar": "/opt/wurstmineberg/jar",
+        "log": "/opt/wurstmineberg/log",
+        "logConfig": "log4j2.xml",
+        "people": "/opt/wurstmineberg/config/people.json",
+        "pidfiles": "/opt/wurstmineberg/var/local/wurstmineberg/pidfiles",
+        "service": "minecraft_server.jar",
+        "sockets": "/opt/wurstmineberg/var/local/wurstmineberg/minecraft_commands",
+        "worlds": "/opt/wurstmineberg/world"
+    },
+    "serviceName": "minecraft_server.jar",
+    "startTimeout": 60,
+    "whitelist": {
+        "additional": [],
+        "enabled": true,
+        "ignorePeople": false
+    },
+    "worlds": {
+        "wurstmineberg": {
+            "enabled": true
+        }
+    },
+    "runUser": "wurstmineberg"
+}
