@@ -1,0 +1,7 @@
+language: python
+python: '3.4'
+script: python setup.py install
+notifications:
+  email: false
+  slack:
+    secure: PsjiAoiqOeEWVkUTAw62D1CGI2XDRTdoX7tqknUIWPzQcldlY1+Y9OHQF+MDDP9V+C8qKzmiS2bNKmoMXNdE5ufmZX/3Zeh+1cbrGL4jfUXj/lViC89KmzndDvtaJLEOAnFgtGz4v9cvOUvZUKKzZU7BGHoUn1oIQykWTF4h148sgUUI0i4vFBl2hLa8dwBkXEHO3eDEqm3MISp24xz6tyP78HYeKInzOrmEGa4B5kfEMH9K01EkYPDiSDYyIEDietNqQgOfQFu4eQD7ZKQAqZG9DKzEpi+24eXoUb7DWU5dxtAxah0y9I07zfImNUQcV/dTTFrxkanO/tRZPKnWwJfnu0WZnVa6Z/tzabFPSi6jx/4l+fN3txZgT/KKLXeZQdn+aum4IqPKSlfL3zFHOGd9z+jwRqi+KU8MdQpj1j2IjlN+zI62Sm671u5NlyWfoK4jexnTgZtV3vHLo58SZEI+W3pm1Kj1KZMVTlaiZ0PniB2H3Bxtj626yIraiP+1OgLNgMBNTJd/V1y9pSS4YhxFB78T3zATlUR+nzVtVZS7p5mAANg4eK9oChSZCwt3nuWX7NA9EttCiFGW3a5ljVEU/fR6Sc7BsQKE0bEcdY/bGnddq/lkTMdw5sVN9liiWS+MKq9aQc/SJqQ5/jOpm2p+bl8ugOMpm/HfMl/Rl2A=

@@ -5,8 +5,9 @@
 Usage:
   minecraft [options] (start | stop | kill | restart | status | backup) [<world>...]
   minecraft [options] (update | revert) [<world> [snapshot <snapshot-id> | <version>]]
+  minecraft [options] saves (on | off) [<world>...]
   minecraft [options] update-all [snapshot <snapshot-id> | <version>]
-  minecraft [options] command <world> <command>...
+  minecraft [options] command <world> [--] <command>...
   minecraft -h | --help
   minecraft --version
 
@@ -25,14 +26,13 @@ import sys
 sys.path.append('/opt/py')
 
 import contextlib
-from datetime import date
-from datetime import datetime
-from docopt import docopt
-from datetime import time as dtime
+import datetime
+import docopt
 import errno
 import gzip
 import json
 import loops
+import mcrcon
 import more_itertools
 import os
 import signal
@@ -46,8 +46,6 @@ import socket
 import subprocess
 import threading
 import time
-from datetime import timedelta
-from datetime import timezone
 import urllib.parse
 
 def parse_version_string():
@@ -63,13 +61,14 @@ def parse_version_string():
 try:
     __version__ = str(parse_version_string())
 except subprocess.CalledProcessError:
-    __version__ = "3.1.0"
+    __version__ = None
 
 from wmb import get_config, from_assets
 CONFIG = get_config("systemd-minecraft", base = from_assets(__file__))
 
 if __name__ == '__main__':
     arguments = docopt(__doc__, version='Minecraft init script ' + __version__)
+    CONFIG_FILE = pathlib.Path(arguments['--config'])
 
 for key in CONFIG['paths']:
     if isinstance(CONFIG['paths'][key], str):
@@ -108,7 +107,7 @@ class World:
             copy_to_latest = self.is_main
         self.save_off(announce=announce, reply=reply)
         if path is None:
-            path = str(self.backup_path / '{}_{:%Y-%m-%d_%Hh%M}'.format(self.name, datetime.utcnow()))
+            path = str(self.backup_path / '{}_{:%Y-%m-%d_%Hh%M}'.format(self.name, datetime.datetime.utcnow()))
         else:
             path = str(path)
         backup_file = pathlib.Path(path + '.tar')
@@ -148,30 +147,20 @@ class World:
 
         Raises:
         MinecraftServerNotRunningError -- If the world is not running and block is set to False.
-        socket.error -- If the world is running but the command socket is disconnected.
+        socket.error -- If the world is running but the RCON connection failed.
         """
-        def file_len(file): #FROM http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
-            for i, l in enumerate(file):
-                pass
-            return i + 1
+        while not self.status():
+            if block:
+                time.sleep(1)
+            else:
+                raise MinecraftServerNotRunningError('')
 
-        if (not block) and not self.status():
-            raise MinecraftServerNotRunningError('')
-        try:
-            with (self.path / 'logs' / 'latest.log').open() as logfile:
-                pre_log_len = file_len(logfile)
-        except (IOError, OSError):
-            pre_log_len = 0
-        except:
-            pre_log_len = None
         cmd += (' ' + ' '.join(str(arg) for arg in args)) if len(args) else ''
-        with socket.socket(socket.AF_UNIX) as s:
-            s.connect(str(self.socket_path))
-            s.sendall(cmd.encode('utf-8') + b'\n')
-        if pre_log_len is None:
-            return None
-        time.sleep(0.2) # assumes that the command will run and print to the log file in less than .2 seconds
-        return _command_output('tail', ['-n', '+' + str(pre_log_len + 1), str(self.path / 'logs' / 'latest.log')])
+
+        rcon = mcrcon.MCRcon()
+        rcon.connect('localhost', self.config['rconPort'])
+        rcon.login(self.config['rconPassword'])
+        return rcon.command(cmd)
 
     def cleanup(self, reply=print):
         if self.pidfile_path.exists():
@@ -184,8 +173,11 @@ class World:
     @property
     def config(self):
         ret = {
+            'customServer': CONFIG['worlds'][self.name].get('customServer', False),
             'enabled': CONFIG['worlds'][self.name].get('enabled', False),
             'javaOptions': CONFIG['javaOptions'].copy(),
+            'rconPassword': CONFIG['worlds'][self.name].get('rconPassword'),
+            'rconPort': CONFIG['worlds'][self.name].get('rconPort', 25575),
             'whitelist': CONFIG['whitelist'].copy()
         }
         ret['javaOptions'].update(CONFIG['worlds'][self.name].get('javaOptions', {}))
@@ -210,11 +202,11 @@ class World:
         reply -- This function is called several times with a string argument representing update progress. Defaults to the built-in print function.
         """
         # get version
-        versions_json = requests.get('https://s3.amazonaws.com/Minecraft.Download/versions/versions.json').json()
+        versions_json = requests.get('https://launchermeta.mojang.com/mc/game/version_manifest.json').json()
         if version is None: # try to dynamically get the latest version number from assets
             version = versions_json['latest']['snapshot' if snapshot else 'release']
         elif snapshot:
-            version = datetime.utcnow().strftime('%yw%V') + version
+            version = datetime.datetime.utcnow().strftime('%yw%V') + version
         for version_dict in versions_json['versions']:
             if version_dict.get('id') == version:
                 snapshot = version_dict.get('type') == 'snapshot'
@@ -228,12 +220,16 @@ class World:
             'is_snapshot': snapshot,
             'version_text': version_text
         }
+        old_version = self.version()
         if override is None:
             override = version == old_version
+        if version_dict is not None and 'url' in version_dict:
+            version_json = requests.get(version_dict['url']).json()
+        else:
+            version_json = None
         # back up world in background
         if make_backup:
-            old_version = self.version()
-            backup_path = self.backup_path / 'pre-update' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.utcnow(), old_version, version)
+            backup_path = self.backup_path / 'pre-update' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.datetime.utcnow(), old_version, version)
             backup_thread = threading.Thread(target=self.backup, kwargs={'reply': reply, 'path': backup_path})
             backup_thread.start()
         # get server jar
@@ -246,7 +242,7 @@ class World:
         if 'clientVersions' in CONFIG['paths']:
             with contextlib.suppress(FileExistsError):
                 (CONFIG['paths']['clientVersions'] / version).mkdir(parents=True)
-            _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/{0}.jar'.format(version), local_filename=str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)))
+            _download('https://s3.amazonaws.com/Minecraft.Download/versions/{0}/{0}.jar'.format(version) if version_json is None else version_json['downloads']['client']['url'], local_filename=str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)))
         # wait for backup to finish
         if make_backup:
             yield 'Download finished. Waiting for backup to finish...'
@@ -271,10 +267,11 @@ class World:
             if client_jar_path.exists():
                 client_jar_path.unlink()
             client_jar_path.symlink_to(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version))
-            try:
-                subprocess.check_call(['mapcrafter_textures.py', str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)), '/usr/local/share/mapcrafter/textures'])
-            except Exception as e:
-                reply('Error while updating mapcrafter textures: {}'.format(e))
+            if CONFIG['updateMapcrafterTextures']:
+                try:
+                    subprocess.check_call(['mapcrafter_textures.py', str(CONFIG['paths']['clientVersions'] / version / '{}.jar'.format(version)), '/usr/local/share/mapcrafter/textures'])
+                except Exception as e:
+                    reply('Error while updating mapcrafter textures: {}'.format(e))
         # restart server
         if was_running:
             self.start(reply=reply, start_message='Server updated. Restarting...', log_path=log_path)
@@ -359,15 +356,15 @@ class World:
         # determine version and backup path
         if path_or_version is None:
             path = sorted((self.backup_path / 'pre-update').iterdir(), key=lambda path: path.stat().st_mtime, reverse=True)[0] # latest pre-update backup
-            version = path.name.split('_')[2]
+            version = path.name.split('_')[3]
         elif isinstance(path_or_version, pathlib.Path):
             path = path_or_version
-            version = path.name.split('_')[2]
+            version = path.name.split('_')[3]
         else:
             version = path_or_version
             if snapshot and len(version) == 1:
-                version = datetime.utcnow().strftime('%yw%V') + version
-            path = next(path for path in sorted((self.backup_path / 'pre-update').iterdir(), key=lambda path: path.stat().st_mtime, reverse=True) if path.name.split('_')[2] == version)
+                version = datetime.datetime.utcnow().strftime('%yw%V') + version
+            path = next(path for path in sorted((self.backup_path / 'pre-update').iterdir(), key=lambda path: path.stat().st_mtime, reverse=True) if path.name.split('_')[3] == version)
         # start iter_update
         update_iterator = self.iter_update(version, log_path=log_path, make_backup=False, override=override, reply=reply)
         version_dict = next(update_iterator)
@@ -375,7 +372,7 @@ class World:
         # make a backup to backup/<world>/reverted
         if make_backup:
             old_version = self.version()
-            backup_path = self.backup_path / 'reverted' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.utcnow(), old_version, version)
+            backup_path = self.backup_path / 'reverted' / '{}_{:%Y-%m-%d_%Hh%M}_{}_{}'.format(self.name, datetime.datetime.utcnow(), old_version, version)
             self.backup(reply=reply, path=backup_path, copy_to_latest=False)
         # stop the server
         was_running = self.status()
@@ -383,7 +380,7 @@ class World:
             self.say('Server will be reverting to ' + version_text + ' and therefore restart')
             time.sleep(5)
             self.stop(reply=reply, log_path=log_path)
-        yield 'Server stopped. Restoring backup...'
+        reply('Server stopped. Restoring backup...')
         # revert Minecraft version
         for message in update_iterator:
             reply(message)
@@ -510,8 +507,6 @@ class World:
             '-Xmx' + str(self.config['javaOptions']['maxHeap']) + 'M',
             '-Xms' + str(self.config['javaOptions']['minHeap']) + 'M',
             '-XX:+UseConcMarkSweepGC',
-            '-XX:+CMSIncrementalMode',
-            '-XX:+CMSIncrementalPacing',
             '-XX:ParallelGCThreads=' + str(self.config['javaOptions']['cpuCount']),
             '-XX:+AggressiveOpts',
             '-Dlog4j.configurationFile=' + str(CONFIG['paths']['logConfig']),
@@ -535,7 +530,7 @@ class World:
         java_popen = subprocess.Popen(invocation, stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=str(self.path)) # start the java process
         with self.pidfile_path.open("w+") as pidfile:
             pidfile.write(str(java_popen.pid))
-        for line in loops.timeout_total(java_popen.stdout, timedelta(seconds=CONFIG['startTimeout'])): # wait until the timeout has been exceeded...
+        for line in loops.timeout_total(java_popen.stdout, datetime.timedelta(seconds=CONFIG['startTimeout'])): # wait until the timeout has been exceeded...
             if re.match('[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} \\[Server thread/INFO\\]: Done \\([0-9]+.[0-9]+s\\)!', line.decode('utf-8')): # ...or the server has finished starting
                 break
         _fork(feed_commands, java_popen) # feed commands from the socket to java
@@ -543,7 +538,7 @@ class World:
         if kwargs.get('log_path'):
             with (kwargs['log_path'].open('a') if hasattr(kwargs['log_path'], 'open') else open(kwargs['log_path'], 'a')) as logins_log:
                 ver = self.version()
-                print(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + (' @restart' if ver is None else ' @start ' + ver), file=logins_log) # logs in UTC
+                print(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + (' @restart' if ver is None else ' @start ' + ver), file=logins_log) # logs in UTC
 
         # Wait for the socket listener to spin up
         for _ in range(20):
@@ -562,6 +557,9 @@ class World:
             try:
                 reply('SERVER SHUTTING DOWN IN 10 SECONDS. Saving map...')
                 notice = kwargs.get('notice', 'SERVER SHUTTING DOWN IN 10 SECONDS. Saving map...')
+                if self.config['rconPassword'] is None:
+                    reply('Cannot communicate with the world, missing RCON password! Killing...')
+                    return self.kill()
                 if notice is not None:
                     self.say(str(notice))
                 self.command('save-all')
@@ -579,7 +577,7 @@ class World:
                     return self.kill()
                 if kwargs.get('log_path'):
                     with (kwargs['log_path'].open('a') if hasattr(kwargs['log_path'], 'open') else open(kwargs['log_path'], 'a')) as logins_log:
-                        print(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + ' @stop', file=logins_log) # logs in UTC
+                        print(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + ' @stop', file=logins_log) # logs in UTC
             except ConnectionRefusedError:
                 reply("Can't communicate with the socket. We need to kill the server...")
                 return self.kill()
@@ -593,6 +591,13 @@ class World:
             message_dict = {'text': message_dict}
         elif isinstance(message_dict, list):
             message_dict = {'text': '', 'extra': message_dict}
+        try:
+            import api.util2
+        except ImportError:
+            pass # no support for Player objects
+        else:
+            if isinstance(player, api.util2.Player):
+                player = player.data['minecraft']['nicks'][-1]
         self.command('tellraw', [player, json.dumps(message_dict)])
 
     def update(self, version=None, snapshot=False, *, log_path=None, make_backup=True, override=False, reply=print):
@@ -607,7 +612,15 @@ class World:
         make_backup -- Whether to back up the world before updating. Defaults to True.
         override -- If this is True and the server jar for the target version already exists, it will be deleted and redownloaded. Defaults to False.
         reply -- This function is called several times with a string argument representing update progress. Defaults to the built-in print function.
+
+        Returns:
+        The new version, a boolean indicating whether or not the new version is a snapshot (or pre-release), and the full name of the new version.
+
+        Raises:
+        NotImplementedError -- For worlds with custom servers.
         """
+        if self.config['customServer']:
+            raise NotImplementedError('Update is not implemented for worlds with custom servers')
         update_iterator = self.iter_update(version=version, snapshot=snapshot, log_path=log_path, make_backup=make_backup, override=override, reply=reply)
         version_dict = next(update_iterator)
         reply('Downloading ' + version_dict['version_text'])
@@ -680,8 +693,10 @@ class World:
                     person['minecraftUUID'] = whitelist_entry['uuid']
 
     def version(self):
-        """Returns the version of Minecraft the world is currently configured to run.
+        """Returns the version of Minecraft the world is currently configured to run. For worlds with custom servers, returns None instead.
         """
+        if self.config['customServer']:
+            return None
         return self.service_path.resolve().stem[len('minecraft_server.'):]
 
     @property
@@ -766,7 +781,7 @@ if __name__ == '__main__':
                 world.kill()
             else:
                 sys.exit('[WARN] Could not kill the "{}" world, PID file does not exist.'.format(world))
-    if arguments['start']:
+    elif arguments['start']:
         for world in selected_worlds:
             if not world.start():
                 sys.exit('[FAIL] Error! Could not start the {} world.'.format(world))
@@ -825,5 +840,13 @@ if __name__ == '__main__':
             cmdlog = world.command(arguments['<command>'][0], arguments['<command>'][1:])
             for line in cmdlog.splitlines():
                 print(str(line))
+    elif arguments['saves']:
+        for world in selected_worlds:
+            if arguments['on']:
+                world.save_on()
+            elif arguments['off']:
+                world.save_off()
+            else:
+                raise NotImplementedError('Subcommand not implemented')
     else:
         raise NotImplementedError('Subcommand not implemented')
