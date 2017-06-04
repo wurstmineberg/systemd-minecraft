@@ -25,6 +25,7 @@
     },
     "serviceName": "minecraft_server.jar",
     "startTimeout": 60,
+    "updateMapcrafterTextures": false,
     "whitelist": {
         "additional": [],
         "enabled": true,
