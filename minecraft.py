@@ -67,7 +67,7 @@ from wmb import get_config, from_assets
 CONFIG = get_config("systemd-minecraft", base = from_assets(__file__))
 
 if __name__ == '__main__':
-    arguments = docopt.docopt(__doc__, version='Minecraft init script ' + __version__)
+    arguments = docopt.docopt(__doc__, version='Minecraft init script {}'.format(__version__))
     CONFIG_FILE = pathlib.Path(arguments['--config'])
 
 for key in CONFIG['paths']:
