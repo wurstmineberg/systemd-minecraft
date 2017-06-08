@@ -631,33 +631,34 @@ class World:
     def update_whitelist(self, people_file=None):
         # get wanted whitelist from people file
         if people_file is None:
-            people_file = CONFIG['paths']['people']
+            people = people.get_people_db().obj_dump(version=3)
+        else:
+            with open(str(people_file)) as people_fobj:
+                people = json.load(people_fobj)['people']
         whitelist = []
         additional = self.config['whitelist']['additional']
         if not self.config['whitelist']['ignorePeople']:
-            with people_file.open() as people_fobj:
-                people = json.load(people_fobj)['people']
-                for person in people:
-                    if not ('minecraft' in person or 'minecraftUUID' in person):
-                        continue
-                    if person.get('status', 'later') not in ['founding', 'later', 'postfreeze']:
-                        continue
-                    if person.get('minecraftUUID'):
-                        uuid = person['minecraftUUID'] if isinstance(person['minecraftUUID'], str) else format(person['minecraftUUID'], 'x')
-                        if 'minecraft' in person:
-                            name = person['minecraft']
-                        else:
-                            name = requests.get('https://api.mojang.com/user/profiles/{}/names'.format(uuid)).json()[-1]['name']
+            for person in people:
+                if not ('minecraft' in person or 'minecraftUUID' in person):
+                    continue
+                if person.get('status', 'later') not in ['founding', 'later', 'postfreeze']:
+                    continue
+                if person.get('minecraftUUID'):
+                    uuid = person['minecraftUUID'] if isinstance(person['minecraftUUID'], str) else format(person['minecraftUUID'], 'x')
+                    if 'minecraft' in person:
+                        name = person['minecraft']
                     else:
-                        response_json = requests.get('https://api.mojang.com/users/profiles/minecraft/{}'.format(person['minecraft'])).json()
-                        uuid = response_json['id']
-                        name = response_json['name']
-                    if '-' not in uuid:
-                        uuid = uuid[:8] + '-' + uuid[8:12] + '-' + uuid[12:16] + '-' + uuid[16:20] + '-' + uuid[20:]
-                    whitelist.append({
-                        'name': name,
-                        'uuid': uuid
-                    })
+                        name = requests.get('https://api.mojang.com/user/profiles/{}/names'.format(uuid)).json()[-1]['name']
+                else:
+                    response_json = requests.get('https://api.mojang.com/users/profiles/minecraft/{}'.format(person['minecraft'])).json()
+                    uuid = response_json['id']
+                    name = response_json['name']
+                if '-' not in uuid:
+                    uuid = uuid[:8] + '-' + uuid[8:12] + '-' + uuid[12:16] + '-' + uuid[16:20] + '-' + uuid[20:]
+                whitelist.append({
+                    'name': name,
+                    'uuid': uuid
+                })
         # write whitelist
         whitelist_path = self.path / 'whitelist.json'
         with whitelist_path.open('a'):
