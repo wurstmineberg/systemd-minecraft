@@ -48,31 +48,19 @@ import threading
 import time
 import urllib.parse
 
-def parse_version_string():
-    path = pathlib.Path(__file__).resolve().parent # go up one level, from repo/minecraft.py to repo, where README.md is located
-    version = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=str(path)).decode('utf-8').strip('\n')
-    if version == 'master':
-        with (path / 'README.md').open() as readme:
-            for line in readme.read().splitlines():
-                if line.startswith('This is version '):
-                    return line.split(' ')[3]
-    return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=str(path)).decode('utf-8').strip('\n')
 
-try:
-    __version__ = str(parse_version_string())
-except subprocess.CalledProcessError:
-    __version__ = None
+from version import __version__
 
 from wmb import get_config, from_assets
 CONFIG = get_config("systemd-minecraft", base = from_assets(__file__))
 
 if __name__ == '__main__':
     arguments = docopt.docopt(__doc__, version='Minecraft init script {}'.format(__version__))
-    CONFIG_FILE = pathlib.Path(arguments['--config'])
 
 for key in CONFIG['paths']:
     if isinstance(CONFIG['paths'][key], str):
         CONFIG['paths'][key] = pathlib.Path(CONFIG['paths'][key])
+
 
 class World:
     def __init__(self, name=None):

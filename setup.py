@@ -8,12 +8,18 @@ setuptools.setup(
     author='Wurstmineberg',
     author_email='mail@wurstmineberg.de',
     py_modules=['minecraft'],
+    use_scm_version={
+        "write_to": "_version.py",
+    },
+    setup_requires=[
+        'setuptools_scm',
+    ],
     install_requires=[
         'docopt',
         'loops',
         'mcrcon',
         'more-itertools',
-        'requests'
+        'requests',
     ],
     dependency_links=[
         'git+https://github.com/fenhl/python-loops.git#egg=loops',
