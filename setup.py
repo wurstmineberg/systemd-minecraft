@@ -7,9 +7,9 @@ setuptools.setup(
     description='A systemd service file for one or more vanilla Minecraft servers',
     author='Wurstmineberg',
     author_email='mail@wurstmineberg.de',
-    py_modules=['minecraft'],
+    packages=['minecraft'],
     use_scm_version={
-        "write_to": "_version.py",
+        'write_to': 'minecraft/_version.py',
     },
     setup_requires=[
         'setuptools_scm',
