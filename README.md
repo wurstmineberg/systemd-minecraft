@@ -1,9 +1,8 @@
 This is **a systemd init script for one or more Notchian (vanilla) [Minecraft][] servers**, with some [Wurstmineberg][]-specific extras.
 
-This is version 3.2.5 ([semver][Semver]) of the init script. The versioned API includes a CLI, as found in the docstring of [`minecraft.py`](minecraft.py), as well as a Python API including all documented functions defined in minecraft.py.
+This is version 4.0.0 ([semver][Semver]) of the init script. The versioned API includes a CLI, as found in the docstring of [`minecraft/__init__.py`](minecraft/__init__.py), as well as a Python API including all documented functions defined in that file.
 
-Requirements
-============
+# Requirements
 
 *   systemd
 *   [Python][] 3.4
@@ -15,12 +14,11 @@ Requirements
 *   [more-itertools][MoreItertools] 2.1
 *   [requests][Requests] 2.1
 
-Configuration
-=============
+# Configuration
 
 1.  Clone the repository somewhere on your system.
-2.  Create a symlink to `minecraft.py` in your Python 3 module search path or add the repository to the module search path.
-3.  Optionally, create a symlink to `minecraft.sh` called `minecraft` in your `PATH`. This will allow you to use commands like `minecraft update`.
+2.  Create a symlink to the `minecraft` directory in your Python 3 module search path or add the repository to the module search path.
+3.  Optionally, create a symlink to `minecraft/__init__.py` called `minecraft` in your `PATH`. This will allow you to use commands like `minecraft update`.
 4.  To immediately start the Minecraft server, `systemctl start minecraft`. To automatically start the Minecraft server with the system, `systemctl enable minecraft`.
 
 To make this work for another server, you may have to modify the paths and other things in the config file.
