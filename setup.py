@@ -8,7 +8,7 @@ setuptools.setup(
     author='Wurstmineberg',
     author_email='mail@wurstmineberg.de',
     packages=['minecraft'],
-    package_data={'minecraft': ['assets/*.json']}
+    package_data={'minecraft': ['assets/*.json']},
     use_scm_version={
         'write_to': 'minecraft/_version.py',
     },
