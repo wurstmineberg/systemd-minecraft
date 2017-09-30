@@ -49,7 +49,7 @@ import time
 import urllib.parse
 
 
-from version import __version__
+from minecraft.version import __version__
 
 from wmb import get_config, from_assets
 CONFIG = get_config("systemd-minecraft", base = from_assets(__file__))

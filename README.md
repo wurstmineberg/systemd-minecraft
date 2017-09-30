@@ -1,6 +1,6 @@
 This is **a systemd init script for one or more Notchian (vanilla) [Minecraft][] servers**, with some [Wurstmineberg][]-specific extras.
 
-This is version 4.0.1 ([semver][Semver]) of the init script. The versioned API includes a CLI, as found in the docstring of [`minecraft/__init__.py`](minecraft/__init__.py), as well as a Python API including all documented functions defined in that file.
+This is version 4.0.2 ([semver][Semver]) of the init script. The versioned API includes a CLI, as found in the docstring of [`minecraft/__init__.py`](minecraft/__init__.py), as well as a Python API including all documented functions defined in that file.
 
 # Requirements
 
