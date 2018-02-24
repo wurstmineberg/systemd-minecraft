@@ -24,6 +24,7 @@ setuptools.setup(
     ],
     dependency_links=[
         'git+https://github.com/fenhl/python-loops.git#egg=loops',
-        'git+https://github.com/wurstmineberg/MCRcon.git#egg=mcrcon'
+        'git+https://github.com/wurstmineberg/MCRcon.git#egg=mcrcon',
+        'git:https://github.com/wurstmineberg/wurstmineberg-common-python.git#egg=wmb'
     ]
 )
