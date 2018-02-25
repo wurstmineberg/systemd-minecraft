@@ -364,7 +364,7 @@ class World:
         # stop the server
         was_running = self.status()
         if was_running:
-            self.say('Server will be reverting to ' + version_text + ' and therefore restart')
+            self.say('Server will be reverting to ' + version_dict["version_text"] + ' and therefore restart')
             time.sleep(5)
             self.stop(reply=reply, log_path=log_path)
         reply('Server stopped. Restoring backup...')
