@@ -11,5 +11,6 @@ This is version 5.0.0 ([semver](https://semver.org/)) of the init script. The ve
 # Configuration
 
 1. `cargo install --git=https://github.com/wurstmineberg/systemd-minecraft --branch=riir`
-2. Enable RCON using the [`enable-rcon`](https://minecraft.gamepedia.com/Server.properties#enable-rcon), [`rcon.password`](https://minecraft.gamepedia.com/Server.properties#rcon.password), and optionally [`rcon.port`](https://minecraft.gamepedia.com/Server.properties#rcon.port) server properties
-3. To automatically start a Minecraft world with the system, `sudo systemctl enable minecraft@worldname` (replace `worldname` with the world name you chose in step 2). To immediately start a Minecraft world, `sudo systemctl start minecraft@worldname`.
+2. Place your server directory (with files like `minecraft_server.jar` and `server.properties`) into `/opt/wurstmineberg/world/worldname` (replace `worldname` with a name of your choice)
+3. Enable RCON using the [`enable-rcon`](https://minecraft.gamepedia.com/Server.properties#enable-rcon), [`rcon.password`](https://minecraft.gamepedia.com/Server.properties#rcon.password), and optionally [`rcon.port`](https://minecraft.gamepedia.com/Server.properties#rcon.port) server properties
+4. To automatically start a Minecraft world with the system, `sudo systemctl enable minecraft@worldname` (replace `worldname` with the world name you chose in step 2). To immediately start a Minecraft world, `sudo systemctl start minecraft@worldname`.
