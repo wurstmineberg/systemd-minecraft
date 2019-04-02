@@ -1,0 +1,18 @@
+[Unit]
+Description=Server for Minecraft world %i
+Documentation=https://github.com/wurstmineberg/systemd-minecraft
+Documentation=https://minecraft.gamepedia.com/Server
+After=network.target
+Conflicts=minecraft.service mscs.service
+
+[Service]
+Restart=always
+RestartSec=1
+ExecStart=/opt/wurstmineberg/.cargo/bin/cargo run --release -- run %i
+#ExecReload=/opt/wurstmineberg/.cargo/bin/cargo run --release -- command %i reload #TODO `minecraft command` subcommand
+User=wurstmineberg
+Group=wurstmineberg
+WorkingDirectory=/opt/git/github.com/wurstmineberg/systemd-minecraft/master
+
+[Install]
+WantedBy=multi-user.target

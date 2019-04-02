@@ -1,0 +1,13 @@
+[package]
+name = "minecraft"
+version = "5.0.0"
+authors = ["Fenhl <fenhl@fenhl.net>"]
+edition = "2018"
+
+[dependencies]
+clap = "2"
+crossbeam-channel = "*"
+itertools = "*"
+rcon = "*"
+signal-hook = "*"
+wrapped_enum = "*"

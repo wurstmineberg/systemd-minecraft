@@ -1,36 +1,15 @@
-This is **a systemd init script for one or more Notchian (vanilla) [Minecraft][] servers**, with some [Wurstmineberg][]-specific extras.
+This is **a systemd init script for one or more vanilla [Minecraft](https://minecraft.net/) servers**, with some [Wurstmineberg](https://wurstmineberg.de/)-specific extras.
 
-This is version 4.0.6 ([semver][Semver]) of the init script. The versioned API includes a CLI, as found in the docstring of [`minecraft/__init__.py`](minecraft/__init__.py), as well as a Python API including all documented functions defined in that file.
+This is version 5.0.0 ([semver](https://semver.org/)) of the init script. The versioned API is a command-line interface, as described by `minecraft --help`, as well as a configuration file format, described below.
 
 # Requirements
 
-*   systemd
-*   [Python][] 3.4
-*   The current version of the Minecraft server, available from [here][MinecraftServerDownload] or using the `minecraft update` command.
-*   [docopt][Docopt]
-*   [lazyjson][LazyJSON] 1.0 (for whitelist management)
-*   [mcrcon][MCRCON]
-*   [loops][PythonLoops] 1.1
-*   [more-itertools][MoreItertools] 2.1
-*   [requests][Requests] 2.1
+* systemd
+* [Rust](https://www.rust-lang.org/) 1.32
+* The current version of the Minecraft server, available from [here](https://minecraft.net/en-us/download/server) or using the `minecraft update` command (returning soon™).
 
 # Configuration
 
-1.  Clone the repository somewhere on your system.
-2.  Create a symlink to the `minecraft` directory in your Python 3 module search path or add the repository to the module search path.
-3.  Optionally, create a symlink to `minecraft/__init__.py` called `minecraft` in your `PATH`. This will allow you to use commands like `minecraft update`.
-4.  To immediately start the Minecraft server, `systemctl start minecraft`. To automatically start the Minecraft server with the system, `systemctl enable minecraft`.
-
-To make this work for another server, you may have to modify the paths and other things in the config file.
-
-[Docopt]: https://github.com/docopt/docopt (github: docopt: docopt)
-[LazyJSON]: https://github.com/fenhl/lazyjson (github: fenhl: lazyjson)
-[MCRCON]: https://github.com/barneygale/MCRcon (github: barneygale: MCRcon)
-[Minecraft]: http://minecraft.net/ (Minecraft)
-[MinecraftServerDownload]: https://minecraft.net/en-us/download/server (Minecraft: Download server)
-[MoreItertools]: http://pypi.python.org/pypi/more-itertools (PyPI: more-itertools)
-[Python]: http://python.org/ (Python)
-[PythonLoops]: https://github.com/fenhl/python-loops (github: fenhl: python-loops)
-[Requests]: http://www.python-requests.org/ (Requests)
-[Semver]: http://semver.org/ (Semantic Versioning 2.0.0)
-[Wurstmineberg]: http://wurstmineberg.de/ (Wurstmineberg)
+1. `cargo install --git=https://github.com/wurstmineberg/systemd-minecraft --branch=riir`
+2. Enable RCON using the [`enable-rcon`](https://minecraft.gamepedia.com/Server.properties#enable-rcon), [`rcon.password`](https://minecraft.gamepedia.com/Server.properties#rcon.password), and optionally [`rcon.port`](https://minecraft.gamepedia.com/Server.properties#rcon.port) server properties
+3. To automatically start a Minecraft world with the system, `sudo systemctl enable minecraft@worldname` (replace `worldname` with the world name you chose in step 2). To immediately start a Minecraft world, `sudo systemctl start minecraft@worldname`.
