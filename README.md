@@ -22,3 +22,9 @@ This is version 5.0.0 ([semver](https://semver.org/)) of the init script. The ve
 * To automatically start a Minecraft world with the system, `sudo systemctl enable minecraft@worldname` (replace `worldname` with the world name you chose in the installation).
 * To immediately start a Minecraft world, `sudo systemctl start minecraft@worldname`.
 * To do both at the same time, `sudo systemctl enable --now minecraft@worldname`.
+
+# Updating
+
+1. `sudo -u wurstmineberg cargo install-update --all --git` (if not present, you can install the `cargo install-update` subcommand using `sudo -u wurstmineberg cargo install cargo-update`)
+2. `sudo cp ~wurstmineberg/.cargo/git/checkouts/systemd-minecraft-*/COMMIT/minecraft@.service /etc/systemd/system/minecraft@.service` (replace `COMMIT` with the first 7 characters of the new git commit hash as shown by `cargo install-update`)
+3. `sudo systemctl daemon-reload`
