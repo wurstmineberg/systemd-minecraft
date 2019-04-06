@@ -5,12 +5,20 @@ This is version 5.0.0 ([semver](https://semver.org/)) of the init script. The ve
 # Requirements
 
 * systemd
-* [Rust](https://www.rust-lang.org/) 1.32
+* [Rust](https://www.rust-lang.org/) 1.32 (but see installation step 1)
 * The current version of the Minecraft server, available from [here](https://minecraft.net/en-us/download/server) or using the `minecraft update` command (returning soon™).
+
+# Installation
+
+1. Create a system user named `wurstmineberg` (we recommend setting the user's home directory to `/opt/wurstmineberg`) and install Rust as that user.
+2. `sudo -u wurstmineberg cargo install --git=https://github.com/wurstmineberg/systemd-minecraft --branch=riir`
+3. `sudo cp ~wurstmineberg/.cargo/git/checkouts/systemd-minecraft-*/*/minecraft@.service /etc/systemd/system/minecraft@.service`
+4. Place your server directory (with files like `minecraft_server.jar` and `server.properties`) into `/opt/wurstmineberg/world/worldname` (replace `worldname` with a name of your choice).
+5. Enable RCON using the [`enable-rcon`](https://minecraft.gamepedia.com/Server.properties#enable-rcon), [`rcon.password`](https://minecraft.gamepedia.com/Server.properties#rcon.password), and optionally [`rcon.port`](https://minecraft.gamepedia.com/Server.properties#rcon.port) server properties.
+6. Repeat steps 4 and 5 for any additional worlds you would like to configure.
 
 # Configuration
 
-1. `cargo install --git=https://github.com/wurstmineberg/systemd-minecraft --branch=riir`
-2. Place your server directory (with files like `minecraft_server.jar` and `server.properties`) into `/opt/wurstmineberg/world/worldname` (replace `worldname` with a name of your choice)
-3. Enable RCON using the [`enable-rcon`](https://minecraft.gamepedia.com/Server.properties#enable-rcon), [`rcon.password`](https://minecraft.gamepedia.com/Server.properties#rcon.password), and optionally [`rcon.port`](https://minecraft.gamepedia.com/Server.properties#rcon.port) server properties
-4. To automatically start a Minecraft world with the system, `sudo systemctl enable minecraft@worldname` (replace `worldname` with the world name you chose in step 2). To immediately start a Minecraft world, `sudo systemctl start minecraft@worldname`.
+* To automatically start a Minecraft world with the system, `sudo systemctl enable minecraft@worldname` (replace `worldname` with the world name you chose in the installation).
+* To immediately start a Minecraft world, `sudo systemctl start minecraft@worldname`.
+* To do both at the same time, `sudo systemctl enable --now minecraft@worldname`.

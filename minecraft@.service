@@ -8,11 +8,11 @@ Conflicts=minecraft.service mscs.service
 [Service]
 Restart=always
 RestartSec=1
-ExecStart=/opt/wurstmineberg/.cargo/bin/cargo run --release -- run %i
-#ExecReload=/opt/wurstmineberg/.cargo/bin/cargo run --release -- command %i reload #TODO `minecraft command` subcommand
+ExecStart=/opt/wurstmineberg/.cargo/bin/minecraft run %i
+#ExecReload=/opt/wurstmineberg/.cargo/bin/minecraft command %i reload #TODO `minecraft command` subcommand
 User=wurstmineberg
 Group=wurstmineberg
-WorkingDirectory=/opt/git/github.com/wurstmineberg/systemd-minecraft/master
+WorkingDirectory=/opt/wurstmineberg/world/%i
 
 [Install]
 WantedBy=multi-user.target
