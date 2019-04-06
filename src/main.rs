@@ -31,23 +31,55 @@ use clap::{
 };
 use crossbeam_channel::select;
 use itertools::Itertools;
+use serde_derive::Deserialize;
 use signal_hook::{
     SIGTERM,
     iterator::Signals
 };
 use wrapped_enum::wrapped_enum;
 
+#[derive(Debug)]
 enum OtherError {
     RconDisabled,
     ServerPropertiesParse
 }
 
 wrapped_enum! {
+    #[derive(Debug)]
     enum Error {
         Io(io::Error),
         Other(OtherError),
         ParseInt(ParseIntError),
-        Rcon(rcon::Error)
+        Rcon(rcon::Error),
+        SerDe(serde_json::Error)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+struct Config {
+    #[serde(rename = "memMaxMB")]
+    mem_max_mb: usize,
+    #[serde(rename = "memMinMB")]
+    mem_min_mb: usize
+}
+
+impl Config {
+    pub fn load(path: impl AsRef<Path>) -> Result<Config, Error> {
+        Ok(if path.as_ref().exists() {
+            serde_json::from_reader(File::open(path.as_ref())?)?
+        } else {
+            Config::default()
+        })
+    }
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            mem_max_mb: 1536, // the recommended default for Linode 2GB
+            mem_min_mb: 1024 // the recommended default for Linode 2GB
+        }
     }
 }
 
@@ -58,7 +90,7 @@ struct ServerProperties {
 }
 
 impl ServerProperties {
-    fn read<P: AsRef<Path>>(path: P) -> Result<ServerProperties, Error> {
+    fn load<P: AsRef<Path>>(path: P) -> Result<ServerProperties, Error> {
         let file = BufReader::new(File::open(path)?);
         let mut prop = ServerProperties::default();
         for line in file.lines() {
@@ -99,12 +131,16 @@ impl World {
         Ok(conn.cmd(cmd)?)
     }
 
+    fn config(&self) -> Result<Config, Error> {
+        Config::load(self.dir().join("systemd-minecraft.json"))
+    }
+
     fn dir(&self) -> PathBuf {
         Path::new("/opt/wurstmineberg/world").join(&self.0)
     }
 
     fn properties(&self) -> Result<ServerProperties, Error> {
-        ServerProperties::read(self.dir().join("server.properties"))
+        ServerProperties::load(self.dir().join("server.properties"))
     }
 
     fn run(&self) {
@@ -116,9 +152,10 @@ impl World {
             }
         });
         //TODO check if already running, refuse to start another server
+        let config = self.config().expect("failed to load systemd-minecraft world config");
         let mut java = Command::new("/usr/bin/java");
-        java.arg("-Xms1024M") //TODO make configurable
-            .arg("-Xmx1536M") //TODO make configurable
+        java.arg(format!("-Xms{}M", config.mem_min_mb))
+            .arg(format!("-Xmx{}M", config.mem_max_mb))
             .arg("-Dlog4j.configurationFile=log4j2.xml") //TODO make configurable
             .arg("-jar")
             .arg(self.dir().join("minecraft_server.jar"))
