@@ -16,3 +16,4 @@ WorkingDirectory=/opt/wurstmineberg/world/%i
 
 [Install]
 WantedBy=multi-user.target
+DefaultInstance=wurstmineberg

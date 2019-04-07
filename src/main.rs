@@ -230,7 +230,7 @@ fn main() -> Result<(), Error> {
     match matches.subcommand() {
         ("cmd", Some(sub_matches)) => {
             let world = sub_matches.value_of("world").map(World::new).unwrap_or_default();
-            world.command(sub_matches.value_of("command").expect("missing command"))?;
+            println!("{}", world.command(sub_matches.value_of("command").expect("missing command"))?);
         }
         ("run", Some(sub_matches)) => {
             let world = sub_matches.value_of("world").map(World::new).unwrap_or_default();
