@@ -1,5 +1,6 @@
 use {
     std::{
+        fmt,
         fs::File,
         io::{
             self,
@@ -37,6 +38,19 @@ pub enum Error {
     RconDisabled,
     SerDe(serde_json::Error),
     ServerPropertiesParse
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::Io(e) => e.fmt(f),
+            Error::ParseInt(e) => e.fmt(f),
+            Error::Rcon(e) => e.fmt(f),
+            Error::RconDisabled => write!(f, "no RCON password is configured for this world"),
+            Error::SerDe(e) => e.fmt(f),
+            Error::ServerPropertiesParse => write!(f, "failed to parse server.properties")
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
