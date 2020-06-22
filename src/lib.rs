@@ -30,6 +30,8 @@ use {
     }
 };
 
+const WORLDS_DIR: &str = "/opt/wurstmineberg/world";
+
 #[derive(Debug, From)]
 pub enum Error {
     Io(io::Error),
@@ -118,6 +120,22 @@ impl Default for ServerProperties {
 pub struct World(String);
 
 impl World {
+    pub fn all() -> io::Result<Vec<World>> {
+        Path::new(WORLDS_DIR).read_dir()?
+            .map_results(|entry| World::new(entry.file_name().to_string_lossy()))
+            .collect()
+    }
+
+    pub fn all_running() -> io::Result<Vec<World>> {
+        let mut running = Vec::default();
+        for world in Self::all()? {
+            if world.is_running()? {
+                running.push(world);
+            }
+        }
+        Ok(running)
+    }
+
     pub fn new(name: impl ToString) -> Self {
         World(name.to_string()) //TODO check if world is configured
     }
@@ -134,7 +152,16 @@ impl World {
     }
 
     pub fn dir(&self) -> PathBuf {
-        Path::new("/opt/wurstmineberg/world").join(&self.0)
+        Path::new(WORLDS_DIR).join(&self.0)
+    }
+
+    pub fn is_running(&self) -> io::Result<bool> { //TODO async?
+        Command::new("systemctl")
+            .arg("is-active")
+            .arg("--quiet")
+            .arg(&self.0)
+            .status()
+            .map(|status| status.success())
     }
 
     pub fn properties(&self) -> Result<ServerProperties, Error> {
