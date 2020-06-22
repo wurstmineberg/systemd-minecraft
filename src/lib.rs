@@ -159,7 +159,7 @@ impl World {
         Command::new("systemctl")
             .arg("is-active")
             .arg("--quiet")
-            .arg(&self.0)
+            .arg(format!("minecraft@{}", self.0))
             .status()
             .map(|status| status.success())
     }
