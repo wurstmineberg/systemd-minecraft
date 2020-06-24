@@ -234,3 +234,9 @@ impl Default for World {
         World("wurstmineberg".to_string()) //TODO get from config
     }
 }
+
+impl fmt::Display for World {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
