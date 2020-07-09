@@ -48,8 +48,10 @@ import threading
 import time
 import urllib.parse
 
-
-from minecraft.version import __version__
+try:
+    from minecraft.version import __version__
+except ImportError:
+    __version__ = None
 
 from wmb import get_config, from_assets
 CONFIG = get_config("systemd-minecraft", base = from_assets(__file__))
