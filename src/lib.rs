@@ -61,7 +61,8 @@ pub struct Config {
     #[serde(rename = "memMaxMB")]
     mem_max_mb: usize,
     #[serde(rename = "memMinMB")]
-    mem_min_mb: usize
+    mem_min_mb: usize,
+    modded: bool
 }
 
 impl Config {
@@ -78,7 +79,8 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             mem_max_mb: 1536, // the recommended default for Linode 2GB
-            mem_min_mb: 1024 // the recommended default for Linode 2GB
+            mem_min_mb: 1024, // the recommended default for Linode 2GB
+            modded: false
         }
     }
 }
@@ -179,12 +181,14 @@ impl World {
         //TODO check if already running, refuse to start another server
         let config = self.config().expect("failed to load systemd-minecraft world config");
         let mut java = Command::new("/usr/bin/java");
-        java.arg(format!("-Xms{}M", config.mem_min_mb))
-            .arg(format!("-Xmx{}M", config.mem_max_mb))
-            .arg("-Dlog4j.configurationFile=log4j2.xml") //TODO make configurable
-            .arg("-jar")
-            .arg(self.dir().join("minecraft_server.jar"))
-            .current_dir(self.dir());
+        java.arg(format!("-Xms{}M", config.mem_min_mb));
+        java.arg(format!("-Xmx{}M", config.mem_max_mb));
+        if !config.modded { // Fabric crashes with this option
+            java.arg("-Dlog4j.configurationFile=log4j2.xml"); //TODO make configurable
+        }
+        java.arg("-jar");
+        java.arg(self.dir().join("minecraft_server.jar"));
+        java.current_dir(self.dir());
         let java = Arc::new(Mutex::new(java.spawn().expect("failed to spawn java command")));
         let java_clone = Arc::clone(&java);
         let (status_tx, status_rx) = crossbeam_channel::bounded(1);
