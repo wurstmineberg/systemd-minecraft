@@ -1,6 +1,6 @@
 [package]
 name = "minecraft"
-version = "5.0.0"
+version = "6.0.0"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2018"
 
@@ -14,14 +14,33 @@ path = "src/main.rs"
 doc = false
 
 [dependencies]
+async-trait = "0.1"
 clap = "2"
 crossbeam-channel = "*"
 derive_more = "0.99"
+futures = "0.3"
 itertools = "0.8"
 rcon = "0.1"
 serde_json = "1"
 signal-hook = "0.1"
 
+[dependencies.reqwest]
+version = "0.10"
+default-features = false
+features = ["json", "rustls-tls", "stream"]
+
 [dependencies.serde]
 version = "1"
 features = ["derive"]
+
+[dependencies.tokio]
+version = "0.2"
+features = ["fs", "macros", "process", "rt-threaded"]
+
+[dependencies.tokio-util]
+version = "0.3"
+features = ["compat"]
+
+[dependencies.url]
+version = "2"
+features = ["serde"]

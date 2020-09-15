@@ -1,7 +1,4 @@
-#![warn(trivial_casts)]
-#![deny(unused)]
-#![deny(rust_2018_idioms)] // this badly-named lint actually produces errors when Rust 2015 idioms are used
-#![forbid(unused_import_braces)]
+#![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
 
 #[macro_use] extern crate clap;
 
@@ -16,7 +13,8 @@ use {
     }
 };
 
-fn main() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     let matches = app_from_crate!()
         .subcommand(SubCommand::with_name("cmd")
             .arg(Arg::with_name("world")
@@ -36,7 +34,7 @@ fn main() -> Result<(), Error> {
     match matches.subcommand() {
         ("cmd", Some(sub_matches)) => {
             let world = sub_matches.value_of("world").map(World::new).unwrap_or_default();
-            println!("{}", world.command(sub_matches.value_of("command").expect("missing command"))?);
+            println!("{}", world.command(sub_matches.value_of("command").expect("missing command")).await?);
         }
         ("run", Some(sub_matches)) => {
             let world = sub_matches.value_of("world").map(World::new).unwrap_or_default();

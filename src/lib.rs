@@ -1,18 +1,16 @@
+#![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
+//#![deny(missing_docs)] //TODO uncomment
+
 use {
     std::{
         fmt,
-        fs::File,
-        io::{
-            self,
-            BufReader,
-            prelude::*
-        },
+        io,
         num::ParseIntError,
         path::{
             Path,
             PathBuf
         },
-        process::Command,
+        process::ExitStatus,
         sync::{
             Arc,
             Mutex
@@ -22,35 +20,57 @@ use {
     },
     crossbeam_channel::select,
     derive_more::From,
+    futures::stream::TryStreamExt as _,
     itertools::Itertools as _,
     serde::Deserialize,
     signal_hook::{
         SIGTERM,
         iterator::Signals
-    }
+    },
+    tokio::{
+        fs::{
+            File,
+            os::unix::symlink
+        },
+        io::BufReader,
+        prelude::*,
+        process::Command
+    },
+    crate::util::CommandExt as _
 };
 
+mod launcher_data;
+mod util;
+
+const BASE_DIR: &str = "/opt/wurstmineberg";
 const WORLDS_DIR: &str = "/opt/wurstmineberg/world";
 
 #[derive(Debug, From)]
 pub enum Error {
+    #[from(ignore)]
+    CommandExit(ExitStatus),
     Io(io::Error),
     ParseInt(ParseIntError),
     Rcon(rcon::Error),
     RconDisabled,
+    Reqwest(reqwest::Error),
     SerDe(serde_json::Error),
-    ServerPropertiesParse
+    ServerPropertiesParse,
+    VersionSpec
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Error::CommandExit(status) => write!(f, "a subcommand exited with {}", status),
             Error::Io(e) => e.fmt(f),
             Error::ParseInt(e) => e.fmt(f),
             Error::Rcon(e) => e.fmt(f),
             Error::RconDisabled => write!(f, "no RCON password is configured for this world"),
+            Error::Reqwest(e) => e.fmt(f),
             Error::SerDe(e) => e.fmt(f),
-            Error::ServerPropertiesParse => write!(f, "failed to parse server.properties")
+            Error::ServerPropertiesParse => write!(f, "failed to parse server.properties"),
+            Error::VersionSpec => write!(f, "given version spec does not match any Minecraft version")
         }
     }
 }
@@ -68,7 +88,7 @@ pub struct Config {
 impl Config {
     pub fn load(path: impl AsRef<Path>) -> Result<Config, Error> {
         Ok(if path.as_ref().exists() {
-            serde_json::from_reader(File::open(path.as_ref())?)?
+            serde_json::from_reader(std::fs::File::open(path.as_ref())?)? //TODO use async_json?
         } else {
             Config::default()
         })
@@ -92,11 +112,11 @@ pub struct ServerProperties {
 }
 
 impl ServerProperties {
-    fn load<P: AsRef<Path>>(path: P) -> Result<ServerProperties, Error> {
-        let file = BufReader::new(File::open(path)?);
+    async fn load(path: impl AsRef<Path>) -> Result<ServerProperties, Error> {
+        let file = BufReader::new(File::open(path).await?);
         let mut prop = ServerProperties::default();
-        for line in file.lines() {
-            let line = line?;
+        let mut lines = file.lines();
+        while let Some(line) = lines.try_next().await? {
             if line.starts_with('#') { continue; }
             let (key, value) = line.splitn(2, '=').collect_tuple().ok_or(Error::ServerPropertiesParse)?;
             match key {
@@ -118,6 +138,25 @@ impl Default for ServerProperties {
     }
 }
 
+/// A specification of acceptable Minecraft versions.
+///
+/// Used in `World::update`.
+#[derive(Debug, From, Clone)]
+pub enum VersionSpec {
+    /// Update to the version with this exact name.
+    Exact(String),
+    /// Update to the latest release, as reported by Mojang.
+    LatestRelease,
+    /// Update to the latest snapshot, as reported by Mojang. Note that this will be a release version if no snapshot has been published since the latest release.
+    LatestSnapshot
+}
+
+impl Default for VersionSpec {
+    fn default() -> VersionSpec {
+        VersionSpec::LatestRelease
+    }
+}
+
 #[derive(Debug)]
 pub struct World(String);
 
@@ -128,10 +167,10 @@ impl World {
             .collect()
     }
 
-    pub fn all_running() -> io::Result<Vec<World>> {
+    pub async fn all_running() -> io::Result<Vec<World>> {
         let mut running = Vec::default();
         for world in Self::all()? {
-            if world.is_running()? {
+            if world.is_running().await? {
                 running.push(world);
             }
         }
@@ -142,8 +181,8 @@ impl World {
         World(name.to_string()) //TODO check if world is configured
     }
 
-    pub fn command(&self, cmd: &str) -> Result<String, Error> {
-        let prop = self.properties()?;
+    pub async fn command(&self, cmd: &str) -> Result<String, Error> {
+        let prop = self.properties().await?;
         //TODO wait until world is running
         let mut conn = rcon::Connection::connect(("localhost", prop.rcon_port), &prop.rcon_password.ok_or(Error::RconDisabled)?)?;
         Ok(conn.cmd(cmd)?)
@@ -157,17 +196,18 @@ impl World {
         Path::new(WORLDS_DIR).join(&self.0)
     }
 
-    pub fn is_running(&self) -> io::Result<bool> { //TODO async?
+    pub async fn is_running(&self) -> io::Result<bool> { //TODO async?
         Command::new("systemctl")
             .arg("is-active")
             .arg("--quiet")
             .arg(format!("minecraft@{}", self.0))
             .status()
+            .await
             .map(|status| status.success())
     }
 
-    pub fn properties(&self) -> Result<ServerProperties, Error> {
-        ServerProperties::load(self.dir().join("server.properties"))
+    pub async fn properties(&self) -> Result<ServerProperties, Error> {
+        ServerProperties::load(self.dir().join("server.properties")).await
     }
 
     pub fn run(&self) {
@@ -180,7 +220,7 @@ impl World {
         });
         //TODO check if already running, refuse to start another server
         let config = self.config().expect("failed to load systemd-minecraft world config");
-        let mut java = Command::new("/usr/bin/java");
+        let mut java = std::process::Command::new("/usr/bin/java"); //TODO replace with tokio command? (not necessarily required since run is intended to be called from systemd only)
         java.arg(format!("-Xms{}M", config.mem_min_mb));
         java.arg(format!("-Xmx{}M", config.mem_max_mb));
         if !config.modded { // Fabric crashes with this option
@@ -227,8 +267,39 @@ impl World {
         }
     }
 
-    pub fn say(&self, text: &str) -> Result<(), Error> {
-        assert_eq!(self.command(&format!("say {}", text))?, String::default());
+    pub async fn say(&self, text: &str) -> Result<(), Error> {
+        assert_eq!(self.command(&format!("say {}", text)).await?, String::default());
+        Ok(())
+    }
+
+    async fn start(&self) -> Result<(), Error> {
+        Command::new("systemctl").arg("start").arg(format!("minecraft@{}", self)).check().await
+    }
+
+    /// Stops the server for this world using `systemctl` and returns whether it was running.
+    async fn stop(&self) -> Result<bool, Error> {
+        let was_running = self.is_running().await?;
+        Command::new("systemctl").arg("stop").arg(format!("minecraft@{}", self)).check().await?;
+        Ok(was_running)
+    }
+
+    pub async fn update(&self, target_version: VersionSpec) -> Result<(), Error> {
+        let client = reqwest::Client::builder().user_agent(concat!("systemd-minecraft/", env!("CARGO_PKG_VERSION"))).build()?;
+        let version_manifest = client.get("https://launchermeta.mojang.com/mc/game/version_manifest.json").send().await?.error_for_status()?.json::<launcher_data::VersionManifest>().await?;
+        let version = version_manifest.get(target_version).ok_or(Error::VersionSpec)?;
+        let server_jar_path = Path::new(BASE_DIR).join("jar").join(format!("minecraft_server.{}.jar", version.id));
+        if !server_jar_path.exists() {
+            let version_info = client.get(version.url.clone()).send().await?.error_for_status()?.json::<launcher_data::VersionInfo>().await?;
+            crate::util::download(
+                &client,
+                version_info.downloads.server.url,
+                &mut File::create(&server_jar_path).await?
+            ).await?;
+        }
+        //TODO also back up world in parallel, once wurstminebackup is working correctly
+        let was_running = self.stop().await?;
+        symlink(server_jar_path, self.dir().join("minecraft_server.jar")).await?;
+        if was_running { self.start().await?; }
         Ok(())
     }
 }
