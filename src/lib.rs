@@ -223,9 +223,7 @@ impl World {
         let mut java = std::process::Command::new("/usr/bin/java"); //TODO replace with tokio command? (not necessarily required since run is intended to be called from systemd only)
         java.arg(format!("-Xms{}M", config.mem_min_mb));
         java.arg(format!("-Xmx{}M", config.mem_max_mb));
-        if !config.modded { // Fabric crashes with this option
-            java.arg("-Dlog4j.configurationFile=log4j2.xml"); //TODO make configurable
-        }
+        java.arg("-Dlog4j.configurationFile=log4j2.xml"); //TODO make configurable
         java.arg("-jar");
         java.arg(self.dir().join("minecraft_server.jar"));
         java.current_dir(self.dir());
