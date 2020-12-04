@@ -1,6 +1,6 @@
 [package]
 name = "minecraft"
-version = "6.0.0"
+version = "6.1.0"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2018"
 
@@ -34,7 +34,7 @@ version = "1"
 features = ["derive"]
 
 [dependencies.tokio]
-version = "0.2"
+version = "0.2" #TODO update to 0.3 once supported by serenity
 features = ["fs", "macros", "process", "rt-threaded"]
 
 [dependencies.tokio-util]
