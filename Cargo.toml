@@ -15,17 +15,20 @@ doc = false
 
 [dependencies]
 async-trait = "0.1"
-clap = "2"
-crossbeam-channel = "*"
-derive_more = "0.99"
+crossbeam-channel = "0.5"
 futures = "0.3"
-itertools = "0.8"
-rcon = "0.1"
+itertools = "0.10"
+rcon = "0.1" #TODO upgrade to 0.4? (async)
 serde_json = "1"
-signal-hook = "0.1"
+signal-hook = "0.1" #TODO upgrade to 0.3?
+
+[dependencies.derive_more]
+version = "0.99"
+default-features = false
+features = ["from"]
 
 [dependencies.reqwest]
-version = "0.10"
+version = "0.11"
 default-features = false
 features = ["json", "rustls-tls", "stream"]
 
@@ -33,14 +36,26 @@ features = ["json", "rustls-tls", "stream"]
 version = "1"
 features = ["derive"]
 
+[dependencies.structopt]
+version = "0.3"
+features = ["paw"]
+
 [dependencies.tokio]
-version = "0.2" #TODO update to 0.3 once supported by serenity
-features = ["fs", "macros", "process", "rt-threaded"]
+version = "1"
+features = ["fs", "macros", "process", "rt-multi-thread"]
+
+[dependencies.tokio-stream]
+version = "0.1"
+features = ["io-util"]
 
 [dependencies.tokio-util]
-version = "0.3"
+version = "0.6"
 features = ["compat"]
 
 [dependencies.url]
 version = "2"
 features = ["serde"]
+
+[dependencies.wheel]
+git = "https://github.com/fenhl/wheel"
+branch = "main"

@@ -4,11 +4,11 @@ use {
     futures::stream::TryStreamExt as _,
     tokio::{
         io::AsyncWrite,
-        process::Command
+        process::Command,
     },
     tokio_util::compat::FuturesAsyncReadCompatExt as _,
     url::Url,
-    crate::Error
+    crate::Error,
 };
 
 #[async_trait]

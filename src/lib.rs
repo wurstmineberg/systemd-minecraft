@@ -3,20 +3,22 @@
 
 use {
     std::{
+        convert::Infallible as Never,
         fmt,
         io,
         num::ParseIntError,
         path::{
             Path,
-            PathBuf
+            PathBuf,
         },
         process::ExitStatus,
+        str::FromStr,
         sync::{
             Arc,
-            Mutex
+            Mutex,
         },
         thread,
-        time::Duration
+        time::Duration,
     },
     crossbeam_channel::select,
     derive_more::From,
@@ -25,18 +27,21 @@ use {
     serde::Deserialize,
     signal_hook::{
         SIGTERM,
-        iterator::Signals
+        iterator::Signals,
     },
     tokio::{
         fs::{
+            self,
             File,
-            os::unix::symlink
         },
-        io::BufReader,
-        prelude::*,
-        process::Command
+        io::{
+            AsyncBufReadExt as _,
+            BufReader,
+        },
+        process::Command,
     },
-    crate::util::CommandExt as _
+    tokio_stream::wrappers::LinesStream,
+    crate::util::CommandExt as _,
 };
 
 mod launcher_data;
@@ -56,7 +61,7 @@ pub enum Error {
     Reqwest(reqwest::Error),
     SerDe(serde_json::Error),
     ServerPropertiesParse,
-    VersionSpec
+    VersionSpec,
 }
 
 impl fmt::Display for Error {
@@ -70,7 +75,7 @@ impl fmt::Display for Error {
             Error::Reqwest(e) => e.fmt(f),
             Error::SerDe(e) => e.fmt(f),
             Error::ServerPropertiesParse => write!(f, "failed to parse server.properties"),
-            Error::VersionSpec => write!(f, "given version spec does not match any Minecraft version")
+            Error::VersionSpec => write!(f, "given version spec does not match any Minecraft version"),
         }
     }
 }
@@ -84,7 +89,7 @@ pub struct Config {
     mem_max_mb: usize,
     #[serde(rename = "memMinMB")]
     mem_min_mb: usize,
-    modded: bool
+    modded: bool,
 }
 
 impl Config {
@@ -102,7 +107,7 @@ impl Default for Config {
         Config {
             mem_max_mb: 1536, // the recommended default for Linode 2GB
             mem_min_mb: 1024, // the recommended default for Linode 2GB
-            modded: false
+            modded: false,
         }
     }
 }
@@ -110,16 +115,16 @@ impl Default for Config {
 #[derive(Debug)]
 pub struct ServerProperties {
     rcon_password: Option<String>,
-    rcon_port: u16
+    rcon_port: u16,
 }
 
 impl ServerProperties {
     async fn load(path: impl AsRef<Path>) -> Result<ServerProperties, Error> {
         let file = BufReader::new(File::open(path).await?);
         let mut prop = ServerProperties::default();
-        let mut lines = file.lines();
+        let mut lines = LinesStream::new(file.lines());
         while let Some(line) = lines.try_next().await? {
-            if line.starts_with('#') { continue; }
+            if line.starts_with('#') { continue }
             let (key, value) = line.splitn(2, '=').collect_tuple().ok_or(Error::ServerPropertiesParse)?;
             match key {
                 "rcon.password" => { prop.rcon_password = Some(value.to_string()); }
@@ -135,7 +140,7 @@ impl Default for ServerProperties {
     fn default() -> ServerProperties {
         ServerProperties {
             rcon_password: None,
-            rcon_port: 22575
+            rcon_port: 22575,
         }
     }
 }
@@ -150,7 +155,7 @@ pub enum VersionSpec {
     /// Update to the latest release, as reported by Mojang.
     LatestRelease,
     /// Update to the latest snapshot, as reported by Mojang. Note that this will be a release version if no snapshot has been published since the latest release.
-    LatestSnapshot
+    LatestSnapshot,
 }
 
 impl Default for VersionSpec {
@@ -165,7 +170,7 @@ pub struct World(String);
 impl World {
     pub fn all() -> io::Result<Vec<World>> {
         Path::new(WORLDS_DIR).read_dir()?
-            .map_results(|entry| World::new(entry.file_name().to_string_lossy()))
+            .map_ok(|entry| World::new(entry.file_name().to_string_lossy()))
             .collect()
     }
 
@@ -236,7 +241,7 @@ impl World {
             loop {
                 if let Some(status) = java_clone.lock().expect("failed to lock subcommand mutex for polling exit status").try_wait().expect("failed to wait for java command") {
                     let _ = status_tx.send(status);
-                    break;
+                    break
                 } else {
                     thread::sleep(Duration::from_secs(1));
                 }
@@ -245,7 +250,7 @@ impl World {
         select! {
             recv(status_rx) -> status => {
                 let status = status.expect("failed to receive exit status");
-                if !status.success() { panic!("java exited with status code {}", status); }
+                if !status.success() { panic!("java exited with status code {}", status) }
             }
             recv(sigterm_rx) -> sigterm => {
                 let () = sigterm.expect("failed to receive SIGTERM");
@@ -256,7 +261,7 @@ impl World {
                 select! {
                     recv(status_rx) -> status => {
                         let status = status.expect("failed to receive exit status");
-                        if !status.success() { panic!("java exited with status code {}", status); }
+                        if !status.success() { panic!("java exited with status code {}", status) }
                     }
                     default(Duration::from_secs(67)) => {
                         eprintln!("The server could not be stopped! Killing...");
@@ -298,7 +303,7 @@ impl World {
         }
         //TODO also back up world in parallel, once wurstminebackup is working correctly
         let was_running = self.stop().await?;
-        symlink(server_jar_path, self.dir().join("minecraft_server.jar")).await?;
+        fs::symlink(server_jar_path, self.dir().join("minecraft_server.jar")).await?;
         if was_running { self.start().await?; }
         Ok(())
     }
@@ -307,6 +312,14 @@ impl World {
 impl Default for World {
     fn default() -> World {
         World("wurstmineberg".to_string()) //TODO get from config
+    }
+}
+
+impl FromStr for World {
+    type Err = Never;
+
+    fn from_str(s: &str) -> Result<World, Never> {
+        Ok(World::new(s))
     }
 }
 
