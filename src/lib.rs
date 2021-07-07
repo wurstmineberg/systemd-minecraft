@@ -278,13 +278,13 @@ impl World {
     }
 
     async fn start(&self) -> Result<(), Error> {
-        Command::new("systemctl").arg("start").arg(format!("minecraft@{}", self)).check().await
+        Command::new("sudo").arg("systemctl").arg("start").arg(format!("minecraft@{}", self)).check().await
     }
 
     /// Stops the server for this world using `systemctl` and returns whether it was running.
     async fn stop(&self) -> Result<bool, Error> {
         let was_running = self.is_running().await?;
-        Command::new("systemctl").arg("stop").arg(format!("minecraft@{}", self)).check().await?;
+        Command::new("sudo").arg("systemctl").arg("stop").arg(format!("minecraft@{}", self)).check().await?;
         Ok(was_running)
     }
 
