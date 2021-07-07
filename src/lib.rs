@@ -289,7 +289,11 @@ impl World {
     }
 
     pub async fn update(&self, target_version: VersionSpec) -> Result<(), Error> {
-        let client = reqwest::Client::builder().user_agent(concat!("systemd-minecraft/", env!("CARGO_PKG_VERSION"))).build()?;
+        let client = reqwest::Client::builder()
+            .user_agent(concat!("systemd-minecraft/", env!("CARGO_PKG_VERSION")))
+            .timeout(Duration::from_secs(30))
+            .use_rustls_tls()
+            .build()?;
         let version_manifest = client.get("https://launchermeta.mojang.com/mc/game/version_manifest.json").send().await?.error_for_status()?.json::<launcher_data::VersionManifest>().await?;
         let version = version_manifest.get(target_version).ok_or(Error::VersionSpec)?;
         let server_jar_path = Path::new(BASE_DIR).join("jar").join(format!("minecraft_server.{}.jar", version.id));
