@@ -41,7 +41,10 @@ use {
         process::Command,
     },
     tokio_stream::wrappers::LinesStream,
-    crate::util::CommandExt as _,
+    crate::util::{
+        CommandExt as _,
+        IoResultExt as _,
+    },
 };
 
 mod launcher_data;
@@ -54,7 +57,8 @@ const WORLDS_DIR: &str = "/opt/wurstmineberg/world";
 pub enum Error {
     #[from(ignore)]
     CommandExit(ExitStatus),
-    Io(io::Error),
+    #[from(ignore)]
+    Io(io::Error, Option<PathBuf>),
     ParseInt(ParseIntError),
     Rcon(rcon::Error),
     RconDisabled,
@@ -68,7 +72,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::CommandExit(status) => write!(f, "a subcommand exited with {}", status),
-            Error::Io(e) => e.fmt(f),
+            Error::Io(e, Some(path)) => write!(f, "I/O error at {}: {}", path.display(), e),
+            Error::Io(e, None) => write!(f, "I/O error: {}", e),
             Error::ParseInt(e) => e.fmt(f),
             Error::Rcon(e) => e.fmt(f),
             Error::RconDisabled => write!(f, "no RCON password is configured for this world"),
@@ -93,9 +98,9 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(path: impl AsRef<Path>) -> Result<Config, Error> {
+    pub fn load(path: impl AsRef<Path> + Copy) -> Result<Config, Error> {
         Ok(if path.as_ref().exists() {
-            serde_json::from_reader(std::fs::File::open(path.as_ref())?)? //TODO use async_json?
+            serde_json::from_reader(std::fs::File::open(path).at(path)?)? //TODO use async_json?
         } else {
             Config::default()
         })
@@ -119,11 +124,11 @@ pub struct ServerProperties {
 }
 
 impl ServerProperties {
-    async fn load(path: impl AsRef<Path>) -> Result<ServerProperties, Error> {
-        let file = BufReader::new(File::open(path).await?);
+    async fn load(path: impl AsRef<Path> + Copy) -> Result<ServerProperties, Error> {
+        let file = BufReader::new(File::open(path).await.at(path)?);
         let mut prop = ServerProperties::default();
         let mut lines = LinesStream::new(file.lines());
-        while let Some(line) = lines.try_next().await? {
+        while let Some(line) = lines.try_next().await.at(path)? {
             if line.starts_with('#') { continue }
             let (key, value) = line.splitn(2, '=').collect_tuple().ok_or(Error::ServerPropertiesParse)?;
             match key {
@@ -168,13 +173,14 @@ impl Default for VersionSpec {
 pub struct World(String);
 
 impl World {
-    pub fn all() -> io::Result<Vec<World>> {
-        Path::new(WORLDS_DIR).read_dir()?
+    pub fn all() -> Result<Vec<World>, Error> {
+        Path::new(WORLDS_DIR).read_dir().at(WORLDS_DIR)?
+            .map(|result| result.at(WORLDS_DIR))
             .map_ok(|entry| World::new(entry.file_name().to_string_lossy()))
             .collect()
     }
 
-    pub async fn all_running() -> io::Result<Vec<World>> {
+    pub async fn all_running() -> Result<Vec<World>, Error> {
         let mut running = Vec::default();
         for world in Self::all()? {
             if world.is_running().await? {
@@ -196,14 +202,14 @@ impl World {
     }
 
     pub fn config(&self) -> Result<Config, Error> {
-        Config::load(self.dir().join("systemd-minecraft.json"))
+        Config::load(&self.dir().join("systemd-minecraft.json"))
     }
 
     pub fn dir(&self) -> PathBuf {
         Path::new(WORLDS_DIR).join(&self.0)
     }
 
-    pub async fn is_running(&self) -> io::Result<bool> { //TODO async?
+    pub async fn is_running(&self) -> Result<bool, Error> {
         Command::new("systemctl")
             .arg("is-active")
             .arg("--quiet")
@@ -211,10 +217,11 @@ impl World {
             .status()
             .await
             .map(|status| status.success())
+            .at_unknown() //TODO annotate?
     }
 
     pub async fn properties(&self) -> Result<ServerProperties, Error> {
-        ServerProperties::load(self.dir().join("server.properties")).await
+        ServerProperties::load(&self.dir().join("server.properties")).await
     }
 
     pub fn run(&self) {
@@ -302,12 +309,16 @@ impl World {
             crate::util::download(
                 &client,
                 version_info.downloads.server.url,
-                &mut File::create(&server_jar_path).await?
+                &mut File::create(&server_jar_path).await.at(&server_jar_path)?
             ).await?;
         }
         //TODO also back up world in parallel, once wurstminebackup is working correctly
         let was_running = self.stop().await?;
-        fs::symlink(server_jar_path, self.dir().join("minecraft_server.jar")).await?;
+        let service_path = self.dir().join("minecraft_server.jar");
+        if fs::symlink_metadata(&service_path).await.is_ok() {
+            fs::remove_file(&service_path).await.at(&service_path)?;
+        }
+        fs::symlink(server_jar_path, &service_path).await.at(service_path)?;
         if was_running { self.start().await?; }
         Ok(())
     }

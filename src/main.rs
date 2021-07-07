@@ -4,18 +4,28 @@ use {
     structopt::StructOpt,
     systemd_minecraft::{
         Error,
+        VersionSpec,
         World,
     }
 };
 
 #[derive(StructOpt)]
 enum Args {
+    /// Runs a Minecraft console command on a world.
     Cmd {
         world: World,
         command: String,
     },
+    /// Runs a Minecraft world. Should not be used directly, use `systemctl start minecraft@worldname` instead.
     Run {
         world: World,
+    },
+    /// Updates Minecraft for a world.
+    Update {
+        world: World,
+        version: Option<String>,
+        #[structopt(long, conflicts_with = "version")]
+        snapshot: bool,
     },
 }
 
@@ -27,6 +37,16 @@ async fn main(args: Args) -> Result<(), Error> {
         }
         Args::Run { world } => {
             world.run();
+        }
+        Args::Update { world, version, snapshot } => {
+            let target_version = if let Some(version) = version {
+                VersionSpec::Exact(version)
+            } else if snapshot {
+                VersionSpec::LatestSnapshot
+            } else {
+                VersionSpec::LatestRelease
+            };
+            world.update(target_version).await?;
         }
     }
     Ok(())
