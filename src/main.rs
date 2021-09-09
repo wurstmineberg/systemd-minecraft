@@ -1,4 +1,5 @@
 #![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
+#![forbid(unsafe_code)]
 
 use {
     structopt::StructOpt,
@@ -16,6 +17,7 @@ enum Args {
         world: World,
         command: String,
     },
+    #[cfg(unix)]
     /// Runs a Minecraft world. Should not be used directly, use `systemctl start minecraft@worldname` instead.
     Run {
         world: World,
@@ -35,6 +37,7 @@ async fn main(args: Args) -> Result<(), Error> {
         Args::Cmd { world, command } => {
             println!("{}", world.command(&command).await?);
         }
+        #[cfg(unix)]
         Args::Run { world } => {
             world.run();
         }

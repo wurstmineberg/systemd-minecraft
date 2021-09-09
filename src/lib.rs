@@ -1,5 +1,6 @@
 #![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
 //#![deny(missing_docs)] //TODO uncomment
+#![forbid(unsafe_code)]
 
 use {
     std::{
@@ -13,22 +14,12 @@ use {
         },
         process::ExitStatus,
         str::FromStr,
-        sync::{
-            Arc,
-            Mutex,
-        },
-        thread,
         time::Duration,
     },
-    crossbeam_channel::select,
     derive_more::From,
     futures::stream::TryStreamExt as _,
     itertools::Itertools as _,
     serde::Deserialize,
-    signal_hook::{
-        SIGTERM,
-        iterator::Signals,
-    },
     tokio::{
         fs::{
             self,
@@ -44,6 +35,20 @@ use {
     crate::util::{
         CommandExt as _,
         IoResultExt as _,
+    },
+};
+#[cfg(unix)] use {
+    std::{
+        sync::{
+            Arc,
+            Mutex,
+        },
+        thread,
+    },
+    crossbeam_channel::select,
+    signal_hook::{
+        SIGTERM,
+        iterator::Signals,
     },
 };
 
@@ -224,6 +229,7 @@ impl World {
         ServerProperties::load(&self.dir().join("server.properties")).await
     }
 
+    #[cfg(unix)]
     pub fn run(&self) {
         let signals = Signals::new(&[SIGTERM]).expect("failed to set up signal handler");
         let (sigterm_tx, sigterm_rx) = crossbeam_channel::bounded(1);
@@ -318,7 +324,8 @@ impl World {
         if fs::symlink_metadata(&service_path).await.is_ok() {
             fs::remove_file(&service_path).await.at(&service_path)?;
         }
-        fs::symlink(server_jar_path, &service_path).await.at(service_path)?;
+        #[cfg(unix)] fs::symlink(server_jar_path, &service_path).await.at(service_path)?;
+        #[cfg(windows)] fs::symlink_file(server_jar_path, &service_path).await.at(service_path)?;
         if was_running { self.start().await?; }
         Ok(())
     }

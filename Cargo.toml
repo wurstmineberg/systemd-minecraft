@@ -15,12 +15,10 @@ doc = false
 
 [dependencies]
 async-trait = "0.1"
-crossbeam-channel = "0.5"
 futures = "0.3"
 itertools = "0.10"
 rcon = "0.1" #TODO upgrade to 0.4? (async)
 serde_json = "1"
-signal-hook = "0.1" #TODO upgrade to 0.3?
 
 [dependencies.derive_more]
 version = "0.99"
@@ -59,3 +57,7 @@ features = ["serde"]
 [dependencies.wheel]
 git = "https://github.com/fenhl/wheel"
 branch = "main"
+
+[target.'cfg(unix)'.dependencies]
+crossbeam-channel = "0.5"
+signal-hook = "0.1" #TODO upgrade to 0.3?
