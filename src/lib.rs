@@ -47,7 +47,7 @@ use {
     },
     crossbeam_channel::select,
     signal_hook::{
-        SIGTERM,
+        consts::signal::SIGTERM,
         iterator::Signals,
     },
 };
@@ -202,8 +202,8 @@ impl World {
     pub async fn command(&self, cmd: &str) -> Result<String, Error> {
         let prop = self.properties().await?;
         //TODO wait until world is running
-        let mut conn = rcon::Connection::connect(("localhost", prop.rcon_port), &prop.rcon_password.ok_or(Error::RconDisabled)?)?;
-        Ok(conn.cmd(cmd)?)
+        let mut conn = rcon::Connection::connect(("localhost", prop.rcon_port), &prop.rcon_password.ok_or(Error::RconDisabled)?).await?;
+        Ok(conn.cmd(cmd).await?)
     }
 
     pub fn config(&self) -> Result<Config, Error> {
@@ -231,7 +231,7 @@ impl World {
 
     #[cfg(unix)]
     pub fn run(&self) {
-        let signals = Signals::new(&[SIGTERM]).expect("failed to set up signal handler");
+        let mut signals = Signals::new(&[SIGTERM]).expect("failed to set up signal handler");
         let (sigterm_tx, sigterm_rx) = crossbeam_channel::bounded(1);
         thread::spawn(move || {
             for _ in signals.forever() {
