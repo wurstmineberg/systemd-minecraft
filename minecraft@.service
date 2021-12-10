@@ -8,7 +8,8 @@ Conflicts=minecraft.service mscs.service
 [Service]
 Restart=always
 RestartSec=1
-OOMScoreAdjust=-500 # make it less likely that Minecraft is killed when the system is out of RAM
+# make it less likely that Minecraft is killed when the system is out of RAM
+OOMScoreAdjust=-500
 ExecStart=/opt/wurstmineberg/.cargo/bin/minecraft run %i
 ExecReload=/opt/wurstmineberg/.cargo/bin/minecraft cmd %i reload
 User=wurstmineberg
