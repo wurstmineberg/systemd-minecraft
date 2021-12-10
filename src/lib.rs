@@ -93,8 +93,9 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 #[derive(Debug, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 pub struct Config {
+    extra_args: Vec<String>,
     #[serde(rename = "memMaxMB")]
     mem_max_mb: usize,
     #[serde(rename = "memMinMB")]
@@ -115,6 +116,7 @@ impl Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
+            extra_args: Vec::default(),
             mem_max_mb: 1536, // the recommended default for Linode 2GB
             mem_min_mb: 1024, // the recommended default for Linode 2GB
             modded: false,
@@ -244,6 +246,9 @@ impl World {
         java.arg(format!("-Xms{}M", config.mem_min_mb));
         java.arg(format!("-Xmx{}M", config.mem_max_mb));
         java.arg("-Dlog4j.configurationFile=log4j2.xml"); //TODO make configurable
+        for arg in config.extra_args {
+            java.arg(arg);
+        }
         java.arg("-jar");
         java.arg(self.dir().join("minecraft_server.jar"));
         java.current_dir(self.dir());
