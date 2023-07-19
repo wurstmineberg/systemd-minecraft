@@ -1,16 +1,13 @@
 #![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
 #![forbid(unsafe_code)]
 
-use {
-    structopt::StructOpt,
-    systemd_minecraft::{
-        Error,
-        VersionSpec,
-        World,
-    }
+use systemd_minecraft::{
+    Error,
+    VersionSpec,
+    World,
 };
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 enum Args {
     /// Runs a Minecraft console command on a world.
     Cmd {
@@ -26,12 +23,12 @@ enum Args {
     Update {
         world: World,
         version: Option<String>,
-        #[structopt(long, conflicts_with = "version")]
+        #[clap(long, conflicts_with = "version")]
         snapshot: bool,
     },
 }
 
-#[wheel::main]
+#[wheel::main(debug)]
 async fn main(args: Args) -> Result<(), Error> {
     match args {
         Args::Cmd { world, command } => {

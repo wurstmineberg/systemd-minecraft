@@ -6,25 +6,18 @@ use {
     std::{
         convert::Infallible as Never,
         fmt,
-        io,
         num::ParseIntError,
         path::{
             Path,
             PathBuf,
         },
-        process::ExitStatus,
         str::FromStr,
         time::Duration,
     },
-    derive_more::From,
     futures::stream::TryStreamExt as _,
     itertools::Itertools as _,
     serde::Deserialize,
     tokio::{
-        fs::{
-            self,
-            File,
-        },
         io::{
             AsyncBufReadExt as _,
             BufReader,
@@ -32,9 +25,15 @@ use {
         process::Command,
     },
     tokio_stream::wrappers::LinesStream,
-    crate::util::{
-        CommandExt as _,
-        IoResultExt as _,
+    wheel::{
+        fs::{
+            self,
+            File,
+        },
+        traits::{
+            AsyncCommandOutputExt as _,
+            IoResultExt as _,
+        },
     },
 };
 #[cfg(unix)] use {
@@ -58,39 +57,20 @@ mod util;
 const BASE_DIR: &str = "/opt/wurstmineberg";
 const WORLDS_DIR: &str = "/opt/wurstmineberg/world";
 
-#[derive(Debug, From)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[from(ignore)]
-    CommandExit(ExitStatus),
-    #[from(ignore)]
-    Io(io::Error, Option<PathBuf>),
-    ParseInt(ParseIntError),
-    Rcon(rcon::Error),
+    #[error(transparent)] ParseInt(#[from] ParseIntError),
+    #[error(transparent)] Json(#[from] serde_json::Error),
+    #[error(transparent)] Rcon(#[from] rcon::Error),
+    #[error(transparent)] Reqwest(#[from] reqwest::Error),
+    #[error(transparent)] Wheel(#[from] wheel::Error),
+    #[error("no RCON password is configured for this world")]
     RconDisabled,
-    Reqwest(reqwest::Error),
-    SerDe(serde_json::Error),
+    #[error("failed to parse server.properties")]
     ServerPropertiesParse,
+    #[error("given version spec does not match any Minecraft version")]
     VersionSpec,
 }
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::CommandExit(status) => write!(f, "a subcommand exited with {}", status),
-            Error::Io(e, Some(path)) => write!(f, "I/O error at {}: {}", path.display(), e),
-            Error::Io(e, None) => write!(f, "I/O error: {}", e),
-            Error::ParseInt(e) => e.fmt(f),
-            Error::Rcon(e) => e.fmt(f),
-            Error::RconDisabled => write!(f, "no RCON password is configured for this world"),
-            Error::Reqwest(e) => e.fmt(f),
-            Error::SerDe(e) => e.fmt(f),
-            Error::ServerPropertiesParse => write!(f, "failed to parse server.properties"),
-            Error::VersionSpec => write!(f, "given version spec does not match any Minecraft version"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
 
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
@@ -132,7 +112,7 @@ pub struct ServerProperties {
 
 impl ServerProperties {
     async fn load(path: impl AsRef<Path> + Copy) -> Result<ServerProperties, Error> {
-        let file = BufReader::new(File::open(path).await.at(path)?);
+        let file = BufReader::new(File::open(path).await?);
         let mut prop = ServerProperties::default();
         let mut lines = LinesStream::new(file.lines());
         while let Some(line) = lines.try_next().await.at(path)? {
@@ -160,7 +140,7 @@ impl Default for ServerProperties {
 /// A specification of acceptable Minecraft versions.
 ///
 /// Used in `World::update`.
-#[derive(Debug, From, Clone)]
+#[derive(Debug, Clone)]
 pub enum VersionSpec {
     /// Update to the version with this exact name.
     Exact(String),
@@ -176,20 +156,20 @@ impl Default for VersionSpec {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct World(String);
 
 impl World {
-    pub fn all() -> Result<Vec<World>, Error> {
-        Path::new(WORLDS_DIR).read_dir().at(WORLDS_DIR)?
-            .map(|result| result.at(WORLDS_DIR))
+    pub async fn all() -> Result<Vec<World>, Error> {
+        fs::read_dir(WORLDS_DIR)
             .map_ok(|entry| World::new(entry.file_name().to_string_lossy()))
-            .collect()
+            .err_into()
+            .try_collect().await
     }
 
     pub async fn all_running() -> Result<Vec<World>, Error> {
         let mut running = Vec::default();
-        for world in Self::all()? {
+        for world in Self::all().await? {
             if world.is_running().await? {
                 running.push(world);
             }
@@ -224,7 +204,8 @@ impl World {
             .status()
             .await
             .map(|status| status.success())
-            .at_unknown() //TODO annotate?
+            .at_command("systemctl")
+            .map_err(Error::Wheel)
     }
 
     pub async fn properties(&self) -> Result<ServerProperties, Error> {
@@ -291,18 +272,19 @@ impl World {
     }
 
     pub async fn say(&self, text: &str) -> Result<(), Error> {
-        assert_eq!(self.command(&format!("say {}", text)).await?, String::default());
+        assert_eq!(self.command(&format!("say {text}")).await?, String::default());
         Ok(())
     }
 
     async fn start(&self) -> Result<(), Error> {
-        Command::new("sudo").arg("--non-interactive").arg("systemctl").arg("start").arg(format!("minecraft@{}", self)).check().await
+        Command::new("sudo").arg("--non-interactive").arg("systemctl").arg("start").arg(format!("minecraft@{self}")).check("systemctl").await?;
+        Ok(())
     }
 
     /// Stops the server for this world using `systemctl` and returns whether it was running.
     async fn stop(&self) -> Result<bool, Error> {
         let was_running = self.is_running().await?;
-        Command::new("sudo").arg("--non-interactive").arg("systemctl").arg("stop").arg(format!("minecraft@{}", self)).check().await?;
+        Command::new("sudo").arg("--non-interactive").arg("systemctl").arg("stop").arg(format!("minecraft@{self}")).check("systemctl").await?;
         Ok(was_running)
     }
 
@@ -320,17 +302,17 @@ impl World {
             crate::util::download(
                 &client,
                 version_info.downloads.server.url,
-                &mut File::create(&server_jar_path).await.at(&server_jar_path)?
+                &mut File::create(&server_jar_path).await?
             ).await?;
         }
         //TODO also back up world in parallel, once wurstminebackup is working correctly
         let was_running = self.stop().await?;
         let service_path = self.dir().join("minecraft_server.jar");
         if fs::symlink_metadata(&service_path).await.is_ok() {
-            fs::remove_file(&service_path).await.at(&service_path)?;
+            fs::remove_file(&service_path).await?;
         }
-        #[cfg(unix)] fs::symlink(server_jar_path, &service_path).await.at(service_path)?;
-        #[cfg(windows)] fs::symlink_file(server_jar_path, &service_path).await.at(service_path)?;
+        #[cfg(unix)] fs::symlink(server_jar_path, &service_path).await?;
+        #[cfg(windows)] fs::symlink_file(server_jar_path, &service_path).await?;
         if was_running { self.start().await?; }
         Ok(())
     }
