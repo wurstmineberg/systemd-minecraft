@@ -119,8 +119,8 @@ impl ServerProperties {
             if line.starts_with('#') { continue }
             let (key, value) = line.splitn(2, '=').collect_tuple().ok_or(Error::ServerPropertiesParse)?;
             match key {
-                "rcon.password" => { prop.rcon_password = Some(value.to_string()); }
-                "rcon.port" => { prop.rcon_port = value.parse()?; }
+                "rcon.password" => prop.rcon_password = Some(value.to_string()),
+                "rcon.port" => prop.rcon_port = value.parse()?,
                 _ => {} //TODO parse remaining keys, reject invalid keys
             }
         }
@@ -249,7 +249,7 @@ impl World {
         select! {
             recv(status_rx) -> status => {
                 let status = status.expect("failed to receive exit status");
-                if !status.success() { panic!("java exited with status code {}", status) }
+                if !status.success() { panic!("java exited with status code {status}") }
             }
             recv(sigterm_rx) -> sigterm => {
                 let () = sigterm.expect("failed to receive SIGTERM");
@@ -260,7 +260,7 @@ impl World {
                 select! {
                     recv(status_rx) -> status => {
                         let status = status.expect("failed to receive exit status");
-                        if !status.success() { panic!("java exited with status code {}", status) }
+                        if !status.success() { panic!("java exited with status code {status}") }
                     }
                     default(Duration::from_secs(67)) => {
                         eprintln!("The server could not be stopped! Killing...");

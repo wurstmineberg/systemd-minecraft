@@ -29,6 +29,6 @@ pub(crate) async fn download(client: &reqwest::Client, url: Url, file: &mut (imp
 fn reqwest_error_to_io(e: reqwest::Error) -> io::Error {
     io::Error::new(
         if e.is_timeout() { io::ErrorKind::TimedOut } else { io::ErrorKind::Other }, //TODO other error kinds depending on methods/status?
-        Box::new(e)
+        Box::new(e),
     )
 }

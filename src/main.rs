@@ -28,16 +28,11 @@ enum Args {
     },
 }
 
-#[wheel::main(debug)]
+#[wheel::main]
 async fn main(args: Args) -> Result<(), Error> {
     match args {
-        Args::Cmd { world, command } => {
-            println!("{}", world.command(&command).await?);
-        }
-        #[cfg(unix)]
-        Args::Run { world } => {
-            world.run();
-        }
+        Args::Cmd { world, command } => println!("{}", world.command(&command).await?),
+        #[cfg(unix)] Args::Run { world } => world.run(),
         Args::Update { world, version, snapshot } => {
             let target_version = if let Some(version) = version {
                 VersionSpec::Exact(version)
