@@ -19,7 +19,7 @@ pub(crate) async fn download(client: &reqwest::Client, url: Url, file: &mut (imp
         .map_err(reqwest_error_to_io)
         .into_async_read()
         .compat();
-    tokio::io::copy(
+    io::copy(
         &mut reader,
         file,
     ).await.at_unknown()?; //TODO annotate?

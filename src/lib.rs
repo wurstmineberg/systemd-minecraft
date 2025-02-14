@@ -19,6 +19,7 @@ use {
     serde::Deserialize,
     tokio::{
         io::{
+            self,
             AsyncBufReadExt as _,
             BufReader,
         },
@@ -64,6 +65,8 @@ pub enum Error {
     #[error(transparent)] Rcon(#[from] rcon::Error),
     #[error(transparent)] Reqwest(#[from] reqwest::Error),
     #[error(transparent)] Wheel(#[from] wheel::Error),
+    #[error("minecraft_server.jar symlink pointing at unexpected target")]
+    JarPath,
     #[error("no RCON password is configured for this world")]
     RconDisabled,
     #[error("failed to parse server.properties")]
@@ -156,18 +159,18 @@ impl Default for VersionSpec {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct World(String);
 
 impl World {
-    pub async fn all() -> Result<Vec<World>, Error> {
+    pub async fn all() -> Result<Vec<Self>, Error> {
         fs::read_dir(WORLDS_DIR)
             .map_ok(|entry| World::new(entry.file_name().to_string_lossy()))
             .err_into()
             .try_collect().await
     }
 
-    pub async fn all_running() -> Result<Vec<World>, Error> {
+    pub async fn all_running() -> Result<Vec<Self>, Error> {
         let mut running = Vec::default();
         for world in Self::all().await? {
             if world.is_running().await? {
@@ -206,6 +209,11 @@ impl World {
             .map(|status| status.success())
             .at_command("systemctl")
             .map_err(Error::Wheel)
+    }
+
+    pub fn status(&self) -> Result<mcping::Response, mcping::Error> {
+        mcping::get_status(&if *self == Self::default() { format!("wurstmineberg.de") } else { format!("{self}.wurstmineberg.de") }, Duration::from_secs(30))
+            .map(|(_, response)| response)
     }
 
     pub async fn properties(&self) -> Result<ServerProperties, Error> {
@@ -299,7 +307,7 @@ impl World {
         let server_jar_path = Path::new(BASE_DIR).join("jar").join(format!("minecraft_server.{}.jar", version.id));
         if !server_jar_path.exists() {
             let version_info = client.get(version.url.clone()).send().await?.error_for_status()?.json::<launcher_data::VersionInfo>().await?;
-            crate::util::download(
+            util::download(
                 &client,
                 version_info.downloads.server.url,
                 &mut File::create(&server_jar_path).await?
@@ -316,11 +324,19 @@ impl World {
         if was_running { self.start().await?; }
         Ok(())
     }
+
+    pub async fn version(&self) -> Result<Option<String>, Error> {
+        match fs::read_link(self.dir().join("minecraft_server.jar")).await {
+            Ok(target) => Ok(Some(target.file_stem().ok_or(Error::JarPath)?.to_str().ok_or(Error::JarPath)?.strip_prefix("minecraft_server.").ok_or(Error::JarPath)?.to_owned())), //TODO return None for custom/modded servers
+            Err(wheel::Error::Io { inner, .. }) if inner.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
 }
 
 impl Default for World {
-    fn default() -> World {
-        World("wurstmineberg".to_string()) //TODO get from config
+    fn default() -> Self {
+        Self(format!("wurstmineberg")) //TODO get from config
     }
 }
 
