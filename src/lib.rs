@@ -213,8 +213,13 @@ impl World {
     }
 
     pub async fn ping(&self) -> craftping::Result<craftping::Response> {
-        let hostname = if *self == Self::default() { format!("wurstmineberg.de") } else { format!("{self}.wurstmineberg.de") };
-        let port = 25565;
+        let (hostname, port) = match &*self.0 {
+            "creative" => (format!("wurstmineberg.de"), 25562),
+            "testworld" => (format!("wurstmineberg.de"), 25580),
+            "usc" => (format!("wurstmineberg.de"), 25569),
+            "wurstmineberg" => (format!("wurstmineberg.de"), 25568),
+            _ => (format!("{self}.wurstmineberg.de"), 25565),
+        };
         let mut stream = TcpStream::connect((&*hostname, port)).await?;
         craftping::tokio::ping(&mut stream, &hostname, port).await
     }
