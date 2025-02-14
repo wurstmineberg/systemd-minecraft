@@ -23,6 +23,7 @@ use {
             AsyncBufReadExt as _,
             BufReader,
         },
+        net::TcpStream,
         process::Command,
     },
     tokio_stream::wrappers::LinesStream,
@@ -211,9 +212,11 @@ impl World {
             .map_err(Error::Wheel)
     }
 
-    pub fn status(&self) -> Result<mcping::Response, mcping::Error> {
-        mcping::get_status(&if *self == Self::default() { format!("wurstmineberg.de") } else { format!("{self}.wurstmineberg.de") }, Duration::from_secs(30))
-            .map(|(_, response)| response)
+    pub async fn ping(&self) -> craftping::Result<craftping::Response> {
+        let hostname = if *self == Self::default() { format!("wurstmineberg.de") } else { format!("{self}.wurstmineberg.de") };
+        let port = 25565;
+        let mut stream = TcpStream::connect((&*hostname, port)).await?;
+        craftping::tokio::ping(&mut stream, &hostname, port).await
     }
 
     pub async fn properties(&self) -> Result<ServerProperties, Error> {
