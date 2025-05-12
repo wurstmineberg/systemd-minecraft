@@ -22,12 +22,16 @@ name = "minecraft"
 path = "src/main.rs"
 doc = false
 
+[features]
+rocket = ["lazy-regex", "dep:rocket"]
+
 [dependencies]
 async-trait = "0.1"
 clap = { version = "4.3.16", features = ["derive"] }
 craftping = { version = "0.7", default-features = false, features = ["async-tokio"] }
 futures = "0.3"
 itertools = "0.14"
+lazy-regex = { version = "3.4.1", optional = true }
 rcon = { version = "0.6", features = ["rt-tokio"] }
 reqwest = { version = "0.12", default-features = false, features = ["charset", "hickory-dns", "http2", "json", "macos-system-configuration", "rustls-tls", "stream"] }
 rocket = { version = "0.5.1", optional = true }

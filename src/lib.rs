@@ -48,6 +48,10 @@ use {
         iterator::Signals,
     },
 };
+#[cfg(feature = "rocket")] use {
+    lazy_regex::regex_is_match,
+    rocket::request::FromParam,
+};
 
 mod launcher_data;
 mod util;
@@ -355,5 +359,33 @@ impl FromStr for World {
 impl fmt::Display for World {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+#[cfg(feature = "rocket")]
+#[derive(Debug, thiserror::Error)]
+pub enum WorldFromParamError {
+    #[error(transparent)] Wheel(#[from] wheel::Error),
+    #[error("the directory for this world does not exist")]
+    Missing,
+    #[error("world name must only consist of ASCII letters/numbers/underscores")]
+    Name,
+}
+
+#[cfg(feature = "rocket")]
+impl<'r> FromParam<'r> for World {
+    type Error = WorldFromParamError;
+
+    fn from_param(param: &'r str) -> Result<Self, Self::Error> {
+        if regex_is_match!("^[0-9A-Za-z_]+$", param) {
+            let world = Self::new(param);
+            if std::fs::exists(world.dir()).at(world.dir())? {
+                Ok(world)
+            } else {
+                Err(WorldFromParamError::Missing)
+            }
+        } else {
+            Err(WorldFromParamError::Name)
+        }
     }
 }
