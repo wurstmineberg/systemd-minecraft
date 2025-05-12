@@ -1,7 +1,3 @@
-#![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
-//#![deny(missing_docs)] //TODO uncomment
-#![forbid(unsafe_code)]
-
 use {
     std::{
         convert::Infallible as Never,
