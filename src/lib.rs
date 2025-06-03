@@ -12,6 +12,7 @@ use {
     },
     futures::stream::TryStreamExt as _,
     itertools::Itertools as _,
+    minecraft::chat::Chat,
     serde::Deserialize,
     tokio::{
         io::{
@@ -302,6 +303,10 @@ impl World {
         let was_running = self.is_running().await?;
         Command::new("sudo").arg("--non-interactive").arg("systemctl").arg("stop").arg(format!("minecraft@{self}")).check("systemctl").await?;
         Ok(was_running)
+    }
+
+    pub async fn tellraw(world: &World, rcpt: &str, msg: &Chat) -> Result<String, Error> {
+        Ok(world.command(&format!("tellraw {} {}", rcpt, msg)).await?)
     }
 
     pub async fn update(&self, target_version: VersionSpec) -> Result<(), Error> {
