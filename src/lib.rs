@@ -164,7 +164,7 @@ impl Default for VersionSpec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(transparent)]
 pub struct World(String);
 
@@ -309,8 +309,8 @@ impl World {
         Ok(was_running)
     }
 
-    pub async fn tellraw(world: &World, rcpt: &str, msg: &Chat) -> Result<String, Error> {
-        Ok(world.command(&format!("tellraw {} {}", rcpt, msg)).await?)
+    pub async fn tellraw(&self, rcpt: &str, msg: &Chat) -> Result<String, Error> {
+        Ok(self.command(&format!("tellraw {} {}", rcpt, msg)).await?)
     }
 
     pub async fn update(&self, target_version: VersionSpec) -> Result<(), Error> {
