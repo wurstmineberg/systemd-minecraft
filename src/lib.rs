@@ -13,7 +13,10 @@ use {
     futures::stream::TryStreamExt as _,
     itertools::Itertools as _,
     minecraft::chat::Chat,
-    serde::Deserialize,
+    serde::{
+        Deserialize,
+        Serialize,
+    },
     tokio::{
         io::{
             self,
@@ -161,7 +164,8 @@ impl Default for VersionSpec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(transparent)]
 pub struct World(String);
 
 impl World {
