@@ -345,7 +345,7 @@ impl World {
     /// Returns `Ok(None)` for modded servers.
     pub async fn version(&self) -> Result<Option<String>, Error> {
         match fs::read_link(self.dir().join("minecraft_server.jar")).await {
-            Ok(target) => Ok(if target.parent().is_some_and(|parent| parent == Path::new("/opt/wurstmineberg/modjar")) {
+            Ok(target) => Ok(if target.parent().is_some_and(|parent| parent == Path::new(BASE_DIR).join("modjar")) {
                 None
             } else {
                 Some(
