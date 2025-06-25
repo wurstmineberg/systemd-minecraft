@@ -71,7 +71,7 @@ pub enum Error {
     #[error(transparent)] Reqwest(#[from] reqwest::Error),
     #[error(transparent)] Wheel(#[from] wheel::Error),
     #[error("minecraft_server.jar symlink pointing at unexpected target")]
-    JarPath,
+    JarPath(PathBuf),
     #[error("no RCON password is configured for this world")]
     RconDisabled,
     #[error("failed to parse server.properties")]
@@ -344,7 +344,13 @@ impl World {
 
     pub async fn version(&self) -> Result<Option<String>, Error> {
         match fs::read_link(self.dir().join("minecraft_server.jar")).await {
-            Ok(target) => Ok(Some(target.file_stem().ok_or(Error::JarPath)?.to_str().ok_or(Error::JarPath)?.strip_prefix("minecraft_server.").ok_or(Error::JarPath)?.to_owned())), //TODO return None for custom/modded servers
+            Ok(target) => Ok(Some(
+                target.file_stem()
+                    .and_then(|file_stem| file_stem.to_str())
+                    .and_then(|file_stem| file_stem.strip_prefix("minecraft_server."))
+                    .map(|version| version.to_owned())
+                    .ok_or_else(move || Error::JarPath(target))?
+            )), //TODO return None for custom/modded servers
             Err(wheel::Error::Io { inner, .. }) if inner.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e.into()),
         }
