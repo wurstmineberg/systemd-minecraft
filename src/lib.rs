@@ -342,15 +342,20 @@ impl World {
         Ok(())
     }
 
+    /// Returns `Ok(None)` for modded servers.
     pub async fn version(&self) -> Result<Option<String>, Error> {
         match fs::read_link(self.dir().join("minecraft_server.jar")).await {
-            Ok(target) => Ok(Some(
-                target.file_stem()
-                    .and_then(|file_stem| file_stem.to_str())
-                    .and_then(|file_stem| file_stem.strip_prefix("minecraft_server."))
-                    .map(|version| version.to_owned())
-                    .ok_or_else(move || Error::JarPath(target))?
-            )), //TODO return None for custom/modded servers
+            Ok(target) => Ok(if target.parent().is_some_and(|parent| parent == Path::new("/opt/wurstmineberg/modjar")) {
+                None
+            } else {
+                Some(
+                    target.file_stem()
+                        .and_then(|file_stem| file_stem.to_str())
+                        .and_then(|file_stem| file_stem.strip_prefix("minecraft_server."))
+                        .map(|version| version.to_owned())
+                        .ok_or_else(move || Error::JarPath(target))?
+                )
+            }),
             Err(wheel::Error::Io { inner, .. }) if inner.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e.into()),
         }
