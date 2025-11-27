@@ -32,7 +32,7 @@ craftping = { version = "0.7", default-features = false, features = ["async-toki
 futures = "0.3"
 itertools = "0.14"
 lazy-regex = { version = "3.4.1", optional = true }
-minecraft = { git = "https://github.com/wurstmineberg/rust-minecraft-types", branch = "main" }
+minecraft = { git = "https://github.com/wurstmineberg/rust-minecraft-types" }
 rcon = { version = "0.6", features = ["rt-tokio"] }
 reqwest = { version = "0.12", default-features = false, features = ["charset", "hickory-dns", "http2", "json", "macos-system-configuration", "rustls-tls", "stream"] }
 rocket = { version = "0.5.1", optional = true }
@@ -43,7 +43,7 @@ tokio = { version = "1", features = ["fs", "macros", "net", "process", "rt-multi
 tokio-stream = { version = "0.1", features = ["io-util"] }
 tokio-util = { version = "0.7", features = ["compat"] }
 url = { version = "2", features = ["serde"] }
-wheel = { git = "https://github.com/fenhl/wheel", branch = "main" }
+wheel = { git = "https://github.com/fenhl/wheel" }
 
 [target.'cfg(unix)'.dependencies]
 crossbeam-channel = "0.5"

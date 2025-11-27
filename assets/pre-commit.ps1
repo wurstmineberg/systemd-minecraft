@@ -13,13 +13,13 @@ if (-not $?)
 }
 
 # copy the tree to the WSL file system to improve compile times
-wsl rsync --delete -av /mnt/c/Users/fenhl/git/github.com/wurstmineberg/systemd-minecraft/stage/ /home/fenhl/wslgit/github.com/wurstmineberg/systemd-minecraft/ --exclude target
+wsl -d ubuntu-m2 rsync --mkpath --delete -av /mnt/c/Users/fenhl/git/github.com/wurstmineberg/systemd-minecraft/stage/ /home/fenhl/wslgit/github.com/wurstmineberg/systemd-minecraft/ --exclude target
 if (-not $?)
 {
     throw 'Native Failure'
 }
 
-wsl env -C /home/fenhl/wslgit/github.com/wurstmineberg/systemd-minecraft cargo check
+wsl -d ubuntu-m2 env -C /home/fenhl/wslgit/github.com/wurstmineberg/systemd-minecraft /home/fenhl/.cargo/bin/cargo check
 if (-not $?)
 {
     throw 'Native Failure'
