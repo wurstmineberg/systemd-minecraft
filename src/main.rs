@@ -30,6 +30,7 @@ enum Args {
 
 #[wheel::main]
 async fn main(args: Args) -> Result<(), Error> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     match args {
         Args::Cmd { world, command } => println!("{}", world.command(&command).await?),
         #[cfg(unix)] Args::Run { world } => world.run(),
